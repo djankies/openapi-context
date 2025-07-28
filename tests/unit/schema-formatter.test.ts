@@ -7,13 +7,14 @@ import {
   summarizeParameters,
   summarizeResponses,
   summarizeAuth,
+  paginateContent,
 } from "@/utils/schema-formatter.js";
 
 describe("Schema Formatter", () => {
   describe("simplifySchema", () => {
     it("should handle null/undefined schemas", () => {
       expect(simplifySchema(null)).toBeNull();
-      expect(simplifySchema(undefined)).toBeUndefined();
+      expect(simplifySchema(undefined)).toBeNull();
     });
 
     it("should collapse allOf patterns", () => {
@@ -22,15 +23,15 @@ describe("Schema Formatter", () => {
           { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
           { type: "object", properties: { age: { type: "number" } }, required: ["age"] },
         ],
-      };
+      } as any;
 
       const result = simplifySchema(schema);
 
-      expect(result.type).toBe("object");
-      expect(result.properties.name).toEqual({ type: "string" });
-      expect(result.properties.age).toEqual({ type: "number" });
-      expect(result.required).toEqual(["name", "age"]);
-      expect(result.allOf).toBeUndefined();
+      expect(result?.type).toBe("object");
+      expect(result?.properties?.name).toEqual({ type: "string" });
+      expect(result?.properties?.age).toEqual({ type: "number" });
+      expect(result?.required).toEqual(["name", "age"]);
+      expect(result?.allOf).toBeUndefined();
     });
 
     it("should simplify UUID patterns", () => {
@@ -42,9 +43,9 @@ describe("Schema Formatter", () => {
 
       const result = simplifySchema(schema);
 
-      expect(result.type).toBe("string");
-      expect(result.format).toBe("uuid");
-      expect(result.pattern).toBeUndefined();
+      expect(result?.type).toBe("string");
+      expect(result?.format).toBe("uuid");
+      expect(result?.pattern).toBeUndefined();
     });
 
     it("should limit examples when specified", () => {
@@ -55,8 +56,8 @@ describe("Schema Formatter", () => {
 
       const result = simplifySchema(schema, { maxExamples: 2 });
 
-      expect(result.examples).toHaveLength(2);
-      expect(result.examples).toEqual(["example1", "example2"]);
+      expect(result?.examples).toHaveLength(2);
+      expect(result?.examples).toEqual(["example1", "example2"]);
     });
 
     it("should remove examples when includeExamples is false", () => {
@@ -67,7 +68,7 @@ describe("Schema Formatter", () => {
 
       const result = simplifySchema(schema, { includeExamples: false });
 
-      expect(result.examples).toBeUndefined();
+      expect(result?.examples).toBeUndefined();
     });
 
     it("should remove descriptions when includeDescriptions is false", () => {
@@ -78,7 +79,7 @@ describe("Schema Formatter", () => {
 
       const result = simplifySchema(schema, { includeDescriptions: false });
 
-      expect(result.description).toBeUndefined();
+      expect(result?.description).toBeUndefined();
     });
 
     it("should handle nested properties recursively", () => {
@@ -100,8 +101,8 @@ describe("Schema Formatter", () => {
 
       const result = simplifySchema(schema);
 
-      expect(result.properties.user.properties.id.format).toBe("uuid");
-      expect(result.properties.user.properties.id.pattern).toBeUndefined();
+      expect(result?.properties?.user?.properties?.id?.format).toBe("uuid");
+      expect(result?.properties?.user?.properties?.id?.pattern).toBeUndefined();
     });
   });
 
@@ -227,8 +228,8 @@ describe("Schema Formatter", () => {
 
   describe("extractRequiredFields", () => {
     it("should return empty array for null/undefined schema", () => {
-      expect(extractRequiredFields(null)).toEqual([]);
-      expect(extractRequiredFields(undefined)).toEqual([]);
+      expect(extractRequiredFields(null as any)).toEqual([]);
+      expect(extractRequiredFields(undefined as any)).toEqual([]);
     });
 
     it("should return empty array for schema without required field", () => {
@@ -253,7 +254,7 @@ describe("Schema Formatter", () => {
     it("should handle non-array required field", () => {
       const schema = {
         type: "object",
-        required: "invalid", // Should be array
+        required: "invalid" as any, // Should be array
       };
 
       expect(extractRequiredFields(schema)).toEqual([]);
@@ -268,10 +269,10 @@ describe("Schema Formatter", () => {
 
     it("should group parameters by location", () => {
       const parameters = [
-        { name: "id", in: "path", required: true },
-        { name: "limit", in: "query", required: false },
-        { name: "offset", in: "query", required: false },
-        { name: "Authorization", in: "header", required: true },
+        { name: "id", in: "path" as const, required: true },
+        { name: "limit", in: "query" as const, required: false },
+        { name: "offset", in: "query" as const, required: false },
+        { name: "Authorization", in: "header" as const, required: true },
       ];
 
       const result = summarizeParameters(parameters);
@@ -279,15 +280,15 @@ describe("Schema Formatter", () => {
     });
 
     it("should include request body info", () => {
-      const parameters = [{ name: "id", in: "path", required: true }];
-      const requestBody = { required: true };
+      const parameters = [{ name: "id", in: "path" as const, required: true }];
+      const requestBody = { required: true, content: {} };
 
       const result = summarizeParameters(parameters, requestBody);
       expect(result).toBe("path: {id}, body: required");
     });
 
     it("should handle optional request body", () => {
-      const requestBody = { required: false };
+      const requestBody = { required: false, content: {} };
 
       const result = summarizeParameters([], requestBody);
       expect(result).toBe("body: optional");
@@ -348,7 +349,7 @@ describe("Schema Formatter", () => {
     });
 
     it("should summarize multiple auth methods with OR", () => {
-      const security = [{ api_key: [] }, { oauth2: ["read", "write"] }];
+      const security = [{ api_key: [] }, { oauth2: ["read", "write"] }] as any;
 
       const result = summarizeAuth(security);
       expect(result).toBe("api_key OR oauth2");
@@ -359,6 +360,173 @@ describe("Schema Formatter", () => {
 
       const result = summarizeAuth(security);
       expect(result).toBe("api_key + oauth2");
+    });
+  });
+
+  describe("enum truncation", () => {
+    it("should truncate large enums in simplifySchema", () => {
+      const schema = {
+        type: "string",
+        enum: Array.from({ length: 20 }, (_, i) => `option${i}`),
+      };
+
+      const result = simplifySchema(schema, { maxEnumValues: 5 });
+      expect(result?.enum).toHaveLength(5);
+      expect(result?.enumTruncated).toBe("...and 15 more values");
+    });
+
+    it("should not truncate small enums", () => {
+      const schema = {
+        type: "string",
+        enum: ["option1", "option2", "option3"],
+      };
+
+      const result = simplifySchema(schema, { maxEnumValues: 10 });
+      expect(result?.enum).toHaveLength(3);
+      expect(result?.enumTruncated).toBeUndefined();
+    });
+  });
+
+  describe("formatCompactSchema improvements", () => {
+    it("should handle enum truncation for small enums", () => {
+      const schema = {
+        type: "string",
+        enum: ["small", "medium", "large"],
+      };
+
+      const result = formatCompactSchema(schema);
+      expect(result).toBe("string [small, medium, large]");
+    });
+
+    it("should handle enum truncation for medium enums", () => {
+      const schema = {
+        type: "string",
+        enum: Array.from({ length: 10 }, (_, i) => `option${i}`),
+      };
+
+      const result = formatCompactSchema(schema);
+      expect(result).toBe("string [option0, option1, option2, ...and 7 more]");
+    });
+
+    it("should handle enum truncation for large enums", () => {
+      const schema = {
+        type: "string",
+        enum: Array.from({ length: 200 }, (_, i) => `icon${i}`),
+      };
+
+      const result = formatCompactSchema(schema);
+      expect(result).toBe("string (200+ options available)");
+    });
+
+    it("should infer type from properties", () => {
+      const schema = {
+        properties: {
+          name: { type: "string" },
+        },
+        required: ["name"],
+      };
+
+      const result = formatCompactSchema(schema);
+      expect(result).toBe("object { name: string }");
+    });
+
+    it("should infer type from enum values", () => {
+      const schema = {
+        enum: [1, 2, 3, 4],
+      };
+
+      const result = formatCompactSchema(schema);
+      expect(result).toBe("number [1, 2, 3, 4]");
+    });
+
+    it("should infer string type from format", () => {
+      const schema = {
+        format: "uuid",
+      };
+
+      const result = formatCompactSchema(schema);
+      expect(result).toBe("string (uuid)");
+    });
+
+    it("should return unknown instead of any", () => {
+      const schema = {};
+
+      const result = formatCompactSchema(schema);
+      expect(result).toBe("unknown");
+    });
+  });
+
+  describe("paginateContent", () => {
+    const longContent = "A".repeat(5000);
+
+    it("should return complete content if it fits in one chunk", () => {
+      const shortContent = "Hello, world!";
+      const result = paginateContent(shortContent);
+
+      expect(result.content).toBe(shortContent);
+      expect(result.hasMore).toBe(false);
+      expect(result.startIndex).toBe(0);
+      expect(result.endIndex).toBe(13);
+      expect(result.totalSize).toBe(13);
+      expect(result.navigationFooter).toBe("📄 Showing complete content (13 characters)");
+    });
+
+    it("should paginate long content", () => {
+      const result = paginateContent(longContent, { chunkSize: 2000 });
+
+      expect(result.content).toHaveLength(2000);
+      expect(result.hasMore).toBe(true);
+      expect(result.startIndex).toBe(0);
+      expect(result.endIndex).toBe(2000);
+      expect(result.totalSize).toBe(5000);
+      expect(result.nextIndex).toBe(2000);
+      expect(result.navigationFooter).toContain("📄 Showing characters 0-2000 of 5000 total");
+      expect(result.navigationFooter).toContain("⏭️  Next chunk: Use index=2000");
+    });
+
+    it("should handle middle pagination", () => {
+      const result = paginateContent(longContent, { startIndex: 2000, chunkSize: 2000 });
+
+      expect(result.content).toHaveLength(2000);
+      expect(result.hasMore).toBe(true);
+      expect(result.startIndex).toBe(2000);
+      expect(result.endIndex).toBe(4000);
+      expect(result.prevIndex).toBe(0);
+      expect(result.nextIndex).toBe(4000);
+      expect(result.navigationFooter).toContain("⏮️  Previous chunk: Use index=0");
+      expect(result.navigationFooter).toContain("⏭️  Next chunk: Use index=4000");
+    });
+
+    it("should handle last chunk", () => {
+      const result = paginateContent(longContent, { startIndex: 4000, chunkSize: 2000 });
+
+      expect(result.content).toHaveLength(1000);
+      expect(result.hasMore).toBe(false);
+      expect(result.startIndex).toBe(4000);
+      expect(result.endIndex).toBe(5000);
+      expect(result.prevIndex).toBe(2000);
+      expect(result.nextIndex).toBeUndefined();
+      expect(result.navigationFooter).toContain("⏮️  Previous chunk: Use index=2000");
+      expect(result.navigationFooter).not.toContain("Next chunk");
+    });
+
+    it("should handle smart breaks with JSON content", () => {
+      const jsonContent = `{
+  "user": {
+    "name": "John",
+    "age": 30
+  },
+  "order": {
+    "id": "123",
+    "total": 99.99
+  }
+}`;
+
+      const result = paginateContent(jsonContent, { chunkSize: 50, smartBreaks: true });
+
+      expect(result.hasMore).toBe(true);
+      // Should break at a reasonable JSON boundary, not mid-property
+      expect(result.content).not.toMatch(/"na$/); // Shouldn't cut off in middle of "name"
     });
   });
 });

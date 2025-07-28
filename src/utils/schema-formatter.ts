@@ -3,21 +3,45 @@
  * to reduce context usage while maintaining essential information
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
+// Note: OpenAPI schemas are inherently dynamic and require any types for proper handling
+// Non-null assertions are safe in regex matching contexts
+
+import type { OpenAPISchema, OpenAPIParameter, OpenAPIRequestBody, OpenAPIResponse, OpenAPISecurityRequirement } from "../types.js";
+
 export interface SimplifyOptions {
   includePatterns?: boolean;
   includeExamples?: boolean;
   maxExamples?: number;
   includeDescriptions?: boolean;
+  maxEnumValues?: number;
+}
+
+export interface PaginationOptions {
+  startIndex?: number;
+  chunkSize?: number;
+  smartBreaks?: boolean;
+}
+
+export interface PaginatedResult {
+  content: string;
+  startIndex: number;
+  endIndex: number;
+  totalSize: number;
+  hasMore: boolean;
+  nextIndex?: number;
+  prevIndex?: number;
+  navigationFooter: string;
 }
 
 /**
  * Simplifies a schema by collapsing allOf patterns, removing duplicates,
  * and converting complex patterns to readable summaries
  */
-export function simplifySchema(schema: any, options: SimplifyOptions = {}): any {
-  if (!schema) return schema;
+export function simplifySchema(schema: OpenAPISchema | null | undefined, options: SimplifyOptions = {}): OpenAPISchema | null {
+  if (!schema) return null;
 
-  const { includePatterns = false, includeExamples = true, maxExamples = 1, includeDescriptions = false } = options;
+  const { includePatterns = false, includeExamples = true, maxExamples = 1, includeDescriptions = false, maxEnumValues = 10 } = options;
 
   // Handle primitive types
   if (typeof schema !== "object") return schema;
@@ -31,6 +55,8 @@ export function simplifySchema(schema: any, options: SimplifyOptions = {}): any 
 
     simplified.allOf.forEach((subSchema: any) => {
       const resolvedSub = simplifySchema(subSchema, options);
+      if (!resolvedSub) return;
+
       // Merge properties
       if (resolvedSub.properties) {
         merged.properties = { ...merged.properties, ...resolvedSub.properties };
@@ -79,6 +105,14 @@ export function simplifySchema(schema: any, options: SimplifyOptions = {}): any 
     delete simplified.description;
   }
 
+  // Truncate large enums
+  if (simplified.enum && Array.isArray(simplified.enum) && simplified.enum.length > maxEnumValues) {
+    const truncatedEnum = simplified.enum.slice(0, maxEnumValues);
+    const remainingCount = simplified.enum.length - maxEnumValues;
+    simplified.enum = truncatedEnum;
+    simplified.enumTruncated = `...and ${remainingCount} more values`;
+  }
+
   // Limit examples
   if (simplified.examples && Array.isArray(simplified.examples)) {
     if (!includeExamples) {
@@ -112,13 +146,24 @@ export function simplifySchema(schema: any, options: SimplifyOptions = {}): any 
  * Formats a schema into a compact string representation
  * Example: "object { message: string (required), count?: number }"
  */
-export function formatCompactSchema(schema: any): string {
+export function formatCompactSchema(schema: OpenAPISchema | undefined): string {
   if (!schema) return "any";
 
   if (schema.type === "string") {
     let result = "string";
     if (schema.format) result += ` (${schema.format})`;
-    if (schema.enum) result += ` [${schema.enum.join(", ")}]`;
+    if (schema.enum) {
+      if (schema.enum.length <= 5) {
+        result += ` [${schema.enum.join(", ")}]`;
+      } else if (schema.enum.length <= 100) {
+        result += ` [${schema.enum.slice(0, 3).join(", ")}, ...and ${schema.enum.length - 3} more]`;
+      } else {
+        result += ` (${schema.enum.length}+ options available)`;
+      }
+    }
+    if (schema.enumTruncated) {
+      result += ` (${schema.enumTruncated})`;
+    }
     return result;
   }
 
@@ -155,20 +200,53 @@ export function formatCompactSchema(schema: any): string {
     return `object { ${propStrings.slice(0, 3).join(", ")}, ... }`;
   }
 
-  return schema.type || "any";
+  // Better type inference for schemas without explicit type
+  if (schema.properties || schema.additionalProperties !== undefined) {
+    return "object";
+  }
+
+  if (schema.items) {
+    return `${formatCompactSchema(schema.items)}[]`;
+  }
+
+  if (schema.enum) {
+    // Infer type from enum values
+    if (schema.enum.length > 0) {
+      const firstType = typeof schema.enum[0];
+      if (schema.enum.every((val: unknown) => typeof val === firstType)) {
+        let result = firstType;
+        if (schema.enum.length <= 5) {
+          result += ` [${schema.enum.join(", ")}]`;
+        } else {
+          result += ` [${schema.enum.slice(0, 3).join(", ")}, ...and ${schema.enum.length - 3} more]`;
+        }
+        return result;
+      }
+    }
+  }
+
+  if (schema.format) {
+    // Infer string type for known formats
+    const stringFormats = ["date-time", "date", "time", "email", "uuid", "uri", "hostname", "ipv4", "ipv6", "password"];
+    if (stringFormats.includes(schema.format)) {
+      return `string (${schema.format})`;
+    }
+  }
+
+  return schema.type || "unknown";
 }
 
 /**
  * Removes duplicate examples based on their content
  */
-export function deduplicateExamples(examples: Record<string, any>): Record<string, any> {
+export function deduplicateExamples(examples: Record<string, unknown>): Record<string, unknown> {
   if (!examples || typeof examples !== "object") return examples;
 
   const seen = new Set<string>();
-  const deduplicated: Record<string, any> = {};
+  const deduplicated: Record<string, unknown> = {};
 
   Object.entries(examples).forEach(([name, example]) => {
-    const exampleValue = example.value || example;
+    const exampleValue = (example as any)?.value || example;
     const serialized = JSON.stringify(exampleValue);
 
     if (!seen.has(serialized)) {
@@ -183,7 +261,7 @@ export function deduplicateExamples(examples: Record<string, any>): Record<strin
 /**
  * Extracts just the required field names from a schema
  */
-export function extractRequiredFields(schema: any): string[] {
+export function extractRequiredFields(schema: OpenAPISchema): string[] {
   if (!schema || !schema.required || !Array.isArray(schema.required)) {
     return [];
   }
@@ -194,7 +272,7 @@ export function extractRequiredFields(schema: any): string[] {
  * Creates a concise parameter summary
  * Example: "path: {id}, query: {limit?, offset?}, body: required"
  */
-export function summarizeParameters(parameters: any[], requestBody?: any): string {
+export function summarizeParameters(parameters: OpenAPIParameter[], requestBody?: OpenAPIRequestBody): string {
   const paramsByLocation: Record<string, string[]> = {};
 
   // Group parameters by location
@@ -236,7 +314,7 @@ export function summarizeParameters(parameters: any[], requestBody?: any): strin
  * Simplifies a response schema to show just status codes and types
  * Example: "200: object, 400: error, 404: error"
  */
-export function summarizeResponses(responses: Record<string, any>): string {
+export function summarizeResponses(responses: Record<string, OpenAPIResponse>): string {
   const summaries: string[] = [];
 
   Object.entries(responses).forEach(([statusCode, response]) => {
@@ -244,9 +322,9 @@ export function summarizeResponses(responses: Record<string, any>): string {
 
     if (response.content) {
       const contentTypes = Object.keys(response.content);
-      if (contentTypes.length > 0 && response.content[contentTypes[0]].schema) {
+      if (contentTypes.length > 0 && response.content[contentTypes[0]]?.schema) {
         const schema = response.content[contentTypes[0]].schema;
-        type = schema.type || "object";
+        type = schema?.type || "object";
       }
     }
 
@@ -259,7 +337,7 @@ export function summarizeResponses(responses: Record<string, any>): string {
 /**
  * Extracts authentication requirements in a concise format
  */
-export function summarizeAuth(security?: any[]): string {
+export function summarizeAuth(security?: OpenAPISecurityRequirement[]): string {
   if (!security || security.length === 0) return "none";
 
   const authMethods = security.map((sec) => {
@@ -268,4 +346,90 @@ export function summarizeAuth(security?: any[]): string {
   });
 
   return authMethods.join(" OR ");
+}
+
+/**
+ * Paginates a long text string into manageable chunks with navigation
+ */
+export function paginateContent(content: string, options: PaginationOptions = {}): PaginatedResult {
+  const { startIndex = 0, chunkSize = 2000, smartBreaks = true } = options;
+
+  const totalSize = content.length;
+
+  // If content fits in one chunk, return it all
+  if (totalSize <= chunkSize) {
+    return {
+      content,
+      startIndex: 0,
+      endIndex: totalSize,
+      totalSize,
+      hasMore: false,
+      navigationFooter: `📄 Showing complete content (${totalSize} characters)`,
+    };
+  }
+
+  // Calculate end index
+  let endIndex = Math.min(startIndex + chunkSize, totalSize);
+
+  // Smart breaks: try to break at logical boundaries
+  if (smartBreaks && endIndex < totalSize) {
+    const searchStart = Math.max(endIndex - 200, startIndex + chunkSize * 0.8);
+    const remainingContent = content.substring(searchStart, endIndex + 200);
+
+    // Look for good break points (in order of preference)
+    const breakPoints = [
+      /}\s*,\s*\n/g, // End of JSON object
+      /]\s*,\s*\n/g, // End of JSON array
+      /,\s*\n\s*"/g, // End of JSON property
+      /\n\s*\n/g, // Double newline
+      /\n/g, // Single newline
+    ];
+
+    for (const breakPattern of breakPoints) {
+      const matches = [...remainingContent.matchAll(breakPattern)];
+      if (matches.length > 0) {
+        // Find the match closest to our target end
+        const targetOffset = endIndex - searchStart;
+        const bestMatch = matches.reduce((best, match) => {
+          const matchPos = match.index! + match[0].length;
+          const currentDistance = Math.abs(matchPos - targetOffset);
+          const bestDistance = Math.abs(best.index! + best[0].length - targetOffset);
+          return currentDistance < bestDistance ? match : best;
+        });
+
+        endIndex = searchStart + bestMatch.index! + bestMatch[0].length;
+        break;
+      }
+    }
+  }
+
+  const chunk = content.substring(startIndex, endIndex);
+  const hasMore = endIndex < totalSize;
+  const hasPrevious = startIndex > 0;
+
+  // Create navigation footer
+  let navigationFooter = `📄 Showing characters ${startIndex}-${endIndex} of ${totalSize} total`;
+
+  if (hasMore || hasPrevious) {
+    navigationFooter += "\n";
+    if (hasPrevious) {
+      const prevIndex = Math.max(0, startIndex - chunkSize);
+      navigationFooter += `⏮️  Previous chunk: Use index=${prevIndex}`;
+    }
+    if (hasMore) {
+      if (hasPrevious) navigationFooter += " | ";
+      navigationFooter += `⏭️  Next chunk: Use index=${endIndex}`;
+    }
+  }
+
+  return {
+    content: chunk,
+    startIndex,
+    endIndex,
+    totalSize,
+    hasMore,
+    nextIndex: hasMore ? endIndex : undefined,
+    prevIndex: hasPrevious ? Math.max(0, startIndex - chunkSize) : undefined,
+    navigationFooter,
+  };
 }

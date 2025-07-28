@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Note: OpenAPI schemas are inherently dynamic and require any types for proper handling
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Config } from "../types.js";
 import { z } from "zod";
@@ -9,6 +12,7 @@ import {
   summarizeParameters,
   summarizeResponses,
   summarizeAuth,
+  paginateContent,
 } from "../utils/schema-formatter.js";
 
 // Tool schemas for input validation
@@ -41,6 +45,8 @@ const GetRequestSchemaSchema = {
   content_type: z.string().optional().describe("Specific content type to return"),
   compact: z.boolean().optional().describe("Return simplified schema without patterns and excess details"),
   raw: z.boolean().optional().describe("Return raw unsimplified schema with all details"),
+  index: z.number().optional().describe("Character index to start reading from (for pagination of large schemas)"),
+  chunk_size: z.number().default(2000).optional().describe("Size of each chunk for pagination (default: 2000 characters)"),
 };
 
 const GetResponseSchemaSchema = {
@@ -50,6 +56,8 @@ const GetResponseSchemaSchema = {
   status_code: z.string().optional().describe("Specific status code to return"),
   compact: z.boolean().optional().describe("Return simplified schema without patterns and excess details"),
   raw: z.boolean().optional().describe("Return raw unsimplified schema with all details"),
+  index: z.number().optional().describe("Character index to start reading from (for pagination of large schemas)"),
+  chunk_size: z.number().default(2000).optional().describe("Size of each chunk for pagination (default: 2000 characters)"),
 };
 
 const SearchOperationsSchema = {
@@ -371,7 +379,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
     "get_request_schema",
     getRequestSchemaDescription,
     GetRequestSchemaSchema,
-    async ({ operation_id, method, path, content_type, compact, raw }) => {
+    async ({ operation_id, method, path, content_type, compact, raw, index, chunk_size }) => {
       try {
         if (!schemaStore.hasSchema()) {
           return createNoSpecError();
@@ -447,6 +455,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
                     includeExamples: true,
                     maxExamples: 1,
                     includeDescriptions: false,
+                    maxEnumValues: 10,
                   });
               result += `\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``;
             }
@@ -476,6 +485,24 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
               }
             }
           }
+        }
+
+        // Apply pagination if index is provided
+        if (index !== undefined) {
+          const paginated = paginateContent(result, {
+            startIndex: index,
+            chunkSize: chunk_size || 2000,
+            smartBreaks: true,
+          });
+
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `${paginated.content}\n\n${paginated.navigationFooter}`,
+              },
+            ],
+          };
         }
 
         return {
@@ -509,7 +536,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
     "get_response_schema",
     getResponseSchemaDescription,
     GetResponseSchemaSchema,
-    async ({ operation_id, method, path, status_code, compact, raw }) => {
+    async ({ operation_id, method, path, status_code, compact, raw, index, chunk_size }) => {
       try {
         if (!schemaStore.hasSchema()) {
           return createNoSpecError();
@@ -612,6 +639,24 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
               result += "No content schema\n\n";
             }
           }
+        }
+
+        // Apply pagination if index is provided
+        if (index !== undefined) {
+          const paginated = paginateContent(result, {
+            startIndex: index,
+            chunkSize: chunk_size || 2000,
+            smartBreaks: true,
+          });
+
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `${paginated.content}\n\n${paginated.navigationFooter}`,
+              },
+            ],
+          };
         }
 
         return {
@@ -859,14 +904,66 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
           result += `**Security:** No global security requirements defined.\n`;
         }
 
-        // Security schemes
+        // Security schemes with enhanced details
         if (currentSchema?.api.components?.securitySchemes) {
           result += `\n**Available Security Schemes:**\n`;
           for (const [name, scheme] of Object.entries(currentSchema.api.components.securitySchemes)) {
-            result += `- **${name}**: ${(scheme as any).type}\n`;
-            if ((scheme as any).description) {
-              result += `  - Description: ${(scheme as any).description}\n`;
+            const schemeObj = scheme as any;
+            result += `- **${name}** (${schemeObj.type})\n`;
+
+            if (schemeObj.description) {
+              result += `  - Description: ${schemeObj.description}\n`;
             }
+
+            // Add practical implementation details based on scheme type
+            if (schemeObj.type === "http") {
+              if (schemeObj.scheme === "bearer") {
+                result += `  - Implementation: \`Authorization: Bearer <token>\`\n`;
+                if (schemeObj.bearerFormat) {
+                  result += `  - Token Format: ${schemeObj.bearerFormat}\n`;
+                }
+              } else if (schemeObj.scheme === "basic") {
+                result += `  - Implementation: \`Authorization: Basic <base64(username:password)>\`\n`;
+              } else {
+                result += `  - Scheme: ${schemeObj.scheme}\n`;
+                result += `  - Implementation: \`Authorization: ${schemeObj.scheme} <credentials>\`\n`;
+              }
+            } else if (schemeObj.type === "apiKey") {
+              result += `  - Location: ${schemeObj.in} parameter\n`;
+              result += `  - Parameter Name: \`${schemeObj.name}\`\n`;
+              if (schemeObj.in === "header") {
+                result += `  - Implementation: \`${schemeObj.name}: <api-key>\`\n`;
+              } else if (schemeObj.in === "query") {
+                result += `  - Implementation: Add \`${schemeObj.name}=<api-key>\` to query string\n`;
+              } else if (schemeObj.in === "cookie") {
+                result += `  - Implementation: Set \`${schemeObj.name}=<api-key>\` cookie\n`;
+              }
+            } else if (schemeObj.type === "oauth2") {
+              result += `  - OAuth2 Flows:\n`;
+              if (schemeObj.flows) {
+                for (const [flowType, flow] of Object.entries(schemeObj.flows)) {
+                  result += `    - **${flowType}**\n`;
+                  if ((flow as any).authorizationUrl) {
+                    result += `      - Auth URL: ${(flow as any).authorizationUrl}\n`;
+                  }
+                  if ((flow as any).tokenUrl) {
+                    result += `      - Token URL: ${(flow as any).tokenUrl}\n`;
+                  }
+                  if ((flow as any).scopes) {
+                    const scopeList = Object.entries((flow as any).scopes)
+                      .map(([scope, desc]) => `${scope}: ${desc}`)
+                      .join(", ");
+                    result += `      - Scopes: ${scopeList}\n`;
+                  }
+                }
+              }
+              result += `  - Implementation: \`Authorization: Bearer <oauth-token>\`\n`;
+            } else if (schemeObj.type === "openIdConnect") {
+              result += `  - OpenID Connect URL: ${schemeObj.openIdConnectUrl}\n`;
+              result += `  - Implementation: \`Authorization: Bearer <id-token>\`\n`;
+            }
+
+            result += `\n`;
           }
         }
       }

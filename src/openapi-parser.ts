@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Note: OpenAPI schemas are inherently dynamic and require any types for proper handling
+
 import SwaggerParser from "@apidevtools/swagger-parser";
 import { createHash } from "crypto";
 import { readFileSync } from "fs";

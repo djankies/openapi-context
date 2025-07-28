@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Note: Test utilities require flexible any types for mocking and testing
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Config } from "@/types.js";
 import { TEST_CONFIG } from "../setup.js";

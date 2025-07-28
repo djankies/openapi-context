@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Note: OpenAPI schemas are inherently dynamic and require any types for proper handling
+
 import { parseOpenAPISpec, extractOperations, ParsedOperation } from "./openapi-parser.js";
 
 export interface LoadedSchema {
