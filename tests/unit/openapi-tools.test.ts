@@ -1,0 +1,443 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { resolve } from "path";
+import { registerOpenAPITools } from "@/tools/openapi-tools.js";
+import { schemaStore } from "@/schema-store.js";
+import {
+  createTestMcpServer,
+  createTestConfig,
+  suppressConsole,
+  TIMEOUTS,
+  isMcpToolRegistered,
+  callMcpTool,
+} from "@tests/utils/test-helpers.js";
+
+describe("OpenAPI Tools", () => {
+  let restoreConsole: () => void;
+
+  beforeEach(() => {
+    restoreConsole = suppressConsole();
+  });
+
+  afterEach(() => {
+    restoreConsole();
+  });
+
+  describe("Tool Registration", () => {
+    it("should register all OpenAPI tools without errors", () => {
+      const server = createTestMcpServer();
+      const config = createTestConfig();
+
+      expect(() => {
+        registerOpenAPITools(server, config);
+      }).not.toThrow();
+    });
+  });
+
+  describe("list_operations tool", () => {
+    let testConfig: any;
+
+    beforeEach(async () => {
+      // Clear any existing schema
+      schemaStore.clearSchema();
+      // Create test config
+      testConfig = createTestConfig();
+      // Load a test spec into schema store
+      const specPath = resolve(__dirname, "../data/simple-api.yaml");
+      await schemaStore.loadSchema(specPath);
+    });
+
+    afterEach(() => {
+      // Clean up schema store
+      schemaStore.clearSchema();
+    });
+
+    it(
+      "should list all operations without filter",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "list_operations")).toBe(true);
+
+        const result = await callMcpTool(server, "list_operations", {});
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("Available API Operations");
+        expect(result.content[0].text).toContain("GET /health");
+        expect(result.content[0].text).toContain("POST /echo");
+        expect(result.content[0].text).toContain("getHealth");
+        expect(result.content[0].text).toContain("postEcho");
+      },
+      TIMEOUTS.UNIT,
+    );
+
+    it(
+      "should filter operations by method",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "list_operations")).toBe(true);
+
+        const result = await callMcpTool(server, "list_operations", { filter: "GET" });
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("GET /health");
+        expect(result.content[0].text).not.toContain("POST /echo");
+      },
+      TIMEOUTS.UNIT,
+    );
+
+    it(
+      "should handle no schema loaded",
+      async () => {
+        // Clear schema store to simulate no loaded spec
+        schemaStore.clearSchema();
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "list_operations")).toBe(true);
+
+        const result = await callMcpTool(server, "list_operations", {});
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("No OpenAPI Spec Available");
+        expect(result.content[0].text).toContain("Mount your OpenAPI file to `/app/spec`");
+        expect(result.content[0].text).toContain("No OpenAPI Spec Available");
+      },
+      TIMEOUTS.UNIT,
+    );
+  });
+
+  describe("get_operation_details tool", () => {
+    let testConfig: any;
+
+    beforeEach(async () => {
+      // Clear any existing schema
+      schemaStore.clearSchema();
+      // Create test config
+      testConfig = createTestConfig();
+      // Load a test spec into schema store
+      const specPath = resolve(__dirname, "../data/simple-api.yaml");
+      await schemaStore.loadSchema(specPath);
+    });
+
+    afterEach(() => {
+      // Clean up schema store
+      schemaStore.clearSchema();
+    });
+
+    it(
+      "should get operation details by operation ID",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "get_operation_details")).toBe(true);
+
+        const result = await callMcpTool(server, "get_operation_details", { operation_id: "getHealth" });
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("Operation: GET /health");
+        expect(result.content[0].text).toContain("**Operation ID:** `getHealth`");
+        expect(result.content[0].text).toContain("**Summary:** Health check");
+        expect(result.content[0].text).toContain("Response Schemas:");
+      },
+      TIMEOUTS.UNIT,
+    );
+
+    it(
+      "should get operation details by method and path",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "get_operation_details")).toBe(true);
+
+        const result = await callMcpTool(server, "get_operation_details", { method: "POST", path: "/echo" });
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("Operation: POST /echo");
+        expect(result.content[0].text).toContain("**Operation ID:** `postEcho`");
+        expect(result.content[0].text).toContain("Request Body Schemas:");
+      },
+      TIMEOUTS.UNIT,
+    );
+
+    it(
+      "should handle operation not found",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "get_operation_details")).toBe(true);
+
+        const result = await callMcpTool(server, "get_operation_details", { operation_id: "nonexistent" });
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("Operation not found: nonexistent");
+      },
+      TIMEOUTS.UNIT,
+    );
+  });
+
+  describe("get_request_schema tool", () => {
+    let testConfig: any;
+
+    beforeEach(async () => {
+      // Clear any existing schema
+      schemaStore.clearSchema();
+      // Create test config
+      testConfig = createTestConfig();
+      // Load a test spec into schema store
+      const specPath = resolve(__dirname, "../data/simple-api.yaml");
+      await schemaStore.loadSchema(specPath);
+    });
+
+    afterEach(() => {
+      // Clean up schema store
+      schemaStore.clearSchema();
+    });
+
+    it(
+      "should get request schema for operation with request body",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "get_request_schema")).toBe(true);
+
+        const result = await callMcpTool(server, "get_request_schema", { operation_id: "postEcho" });
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("Request Schema for POST /echo");
+        expect(result.content[0].text).toContain("Content-Type: `application/json`");
+        expect(result.content[0].text).toContain('"type": "object"');
+        expect(result.content[0].text).toContain('"message"');
+      },
+      TIMEOUTS.UNIT,
+    );
+
+    it(
+      "should handle operation without request body",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "get_request_schema")).toBe(true);
+
+        const result = await callMcpTool(server, "get_request_schema", { operation_id: "getHealth" });
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("No Request Body");
+      },
+      TIMEOUTS.UNIT,
+    );
+  });
+
+  describe("get_response_schema tool", () => {
+    let testConfig: any;
+
+    beforeEach(async () => {
+      // Clear any existing schema
+      schemaStore.clearSchema();
+      // Create test config
+      testConfig = createTestConfig();
+      // Load a test spec into schema store
+      const specPath = resolve(__dirname, "../data/simple-api.yaml");
+      await schemaStore.loadSchema(specPath);
+    });
+
+    afterEach(() => {
+      // Clean up schema store
+      schemaStore.clearSchema();
+    });
+
+    it(
+      "should get response schemas for operation",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "get_response_schema")).toBe(true);
+
+        const result = await callMcpTool(server, "get_response_schema", { operation_id: "getHealth" });
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("Response Schema for GET /health");
+        expect(result.content[0].text).toContain("Status Code: `200`");
+        expect(result.content[0].text).toContain("Content-Type: `application/json`");
+        expect(result.content[0].text).toContain('"status"');
+        expect(result.content[0].text).toContain('"timestamp"');
+      },
+      TIMEOUTS.UNIT,
+    );
+
+    it(
+      "should filter by status code",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "get_response_schema")).toBe(true);
+
+        const result = await callMcpTool(server, "get_response_schema", {
+          operation_id: "getHealth",
+          status_code: "200",
+        });
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("Status Code: `200`");
+        expect(result.content[0].text).not.toContain("Status Code: `400`");
+      },
+      TIMEOUTS.UNIT,
+    );
+  });
+
+  describe("search_operations tool", () => {
+    let testConfig: any;
+
+    beforeEach(async () => {
+      // Clear any existing schema
+      schemaStore.clearSchema();
+      // Create test config
+      testConfig = createTestConfig();
+      // Load a test spec into schema store
+      const specPath = resolve(__dirname, "../data/simple-api.yaml");
+      await schemaStore.loadSchema(specPath);
+    });
+
+    afterEach(() => {
+      // Clean up schema store
+      schemaStore.clearSchema();
+    });
+
+    it(
+      "should search operations by query",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "search_operations")).toBe(true);
+
+        const result = await callMcpTool(server, "search_operations", { query: "health" });
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("Search Results");
+        expect(result.content[0].text).toContain("GET /health");
+        expect(result.content[0].text).toContain("getHealth");
+        expect(result.content[0].text).not.toContain("POST /echo");
+      },
+      TIMEOUTS.UNIT,
+    );
+
+    it(
+      "should return no results for non-matching query",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "search_operations")).toBe(true);
+
+        const result = await callMcpTool(server, "search_operations", { query: "nonexistent" });
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("No Operations Found");
+      },
+      TIMEOUTS.UNIT,
+    );
+  });
+
+  describe("get_server_info tool", () => {
+    let testConfig: any;
+
+    beforeEach(async () => {
+      // Clear any existing schema
+      schemaStore.clearSchema();
+      // Create test config
+      testConfig = createTestConfig();
+      // Load a test spec into schema store
+      const specPath = resolve(__dirname, "../data/simple-api.yaml");
+      await schemaStore.loadSchema(specPath);
+    });
+
+    afterEach(() => {
+      // Clean up schema store
+      schemaStore.clearSchema();
+    });
+
+    it(
+      "should get server information",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "get_server_info")).toBe(true);
+
+        const result = await callMcpTool(server, "get_server_info", {});
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("API Server Information");
+        expect(result.content[0].text).toContain("**API:** Simple Test API v1.0.0");
+        expect(result.content[0].text).toContain("- Operations: 2");
+      },
+      TIMEOUTS.UNIT,
+    );
+
+    it(
+      "should handle no loaded schema",
+      async () => {
+        // Clear schema store to simulate no loaded spec
+        schemaStore.clearSchema();
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+
+        expect(isMcpToolRegistered(server, "get_server_info")).toBe(true);
+
+        const result = await callMcpTool(server, "get_server_info", {});
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("No OpenAPI Spec Available");
+        expect(result.content[0].text).toContain("No OpenAPI Spec Available");
+      },
+      TIMEOUTS.UNIT,
+    );
+  });
+
+  describe("Error Handling", () => {
+    it(
+      "should handle missing schema gracefully",
+      async () => {
+        // Clear schema store to simulate no loaded spec
+        schemaStore.clearSchema();
+        const server = createTestMcpServer();
+        const config = createTestConfig();
+        registerOpenAPITools(server, config);
+
+        expect(isMcpToolRegistered(server, "list_operations")).toBe(true);
+
+        const result = await callMcpTool(server, "list_operations", {});
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("No OpenAPI Spec Available");
+        expect(result.content[0].text).toContain("No OpenAPI Spec Available");
+      },
+      TIMEOUTS.UNIT,
+    );
+  });
+});

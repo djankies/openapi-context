@@ -1,0 +1,27 @@
+{
+    "compilerOptions": {
+        "target": "es2021",
+        "lib": ["es2021"],
+
+        "module": "es2022",
+        "moduleResolution": "node",
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["src/*"],
+            "@tests/*": ["tests/*"]
+        },
+        "types": ["node"],
+        "resolveJsonModule": true,
+        "outDir": "./dist",
+        "rootDir": ".",
+        "allowJs": true,
+        "checkJs": false,
+        "isolatedModules": true,
+        "allowSyntheticDefaultImports": true,
+        "forceConsistentCasingInFileNames": true,
+        "strict": true,
+        "skipLibCheck": true
+    },
+    "include": ["src/**/*", "tests/**/*"],
+    "exclude": ["node_modules", "dist", "examples/**/*"]
+}
