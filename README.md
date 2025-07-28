@@ -854,7 +854,30 @@ npm run type-check
 
 # Development mode with watch
 npm run dev
+
+# Quality checks
+npm run lint              # Check code quality
+npm run lint:fix          # Auto-fix linting issues  
+npm run format            # Format code with Prettier
+npm run format:check      # Check formatting
+npm run ci                # Run full CI pipeline
 ```
+
+### Git Hooks
+
+This project uses [Husky](https://typicode.github.io/husky/) for Git hooks to ensure code quality:
+
+- **Pre-commit**: Automatically runs the full CI pipeline (`npm run ci`) before each commit
+- **Quality gates**: Prevents commits that fail type checking, linting, formatting, or tests
+- **Auto-setup**: Hooks are automatically installed when you run `npm install`
+
+The pre-commit hook runs:
+1. `npm run type-check` - TypeScript type checking
+2. `npm run lint` - ESLint code quality checks  
+3. `npm run format:check` - Prettier formatting verification
+4. `npm run test:run` - Full test suite execution
+
+If any step fails, the commit is rejected and you'll need to fix the issues before committing.
 
 ## Environment Variables
 
