@@ -412,7 +412,7 @@ describe("OpenAPI Tools", () => {
         expect(result.content).toBeDefined();
         expect(result.content[0].type).toBe("text");
         expect(result.content[0].text).toContain("No OpenAPI Spec Available");
-        expect(result.content[0].text).toContain("No OpenAPI Spec Available");
+        expect(result.content[0].text).toContain("Call the `help()` tool");
       },
       TIMEOUTS.UNIT,
     );
@@ -435,7 +435,70 @@ describe("OpenAPI Tools", () => {
         expect(result.content).toBeDefined();
         expect(result.content[0].type).toBe("text");
         expect(result.content[0].text).toContain("No OpenAPI Spec Available");
-        expect(result.content[0].text).toContain("No OpenAPI Spec Available");
+        expect(result.content[0].text).toContain("Call the `help()` tool");
+      },
+      TIMEOUTS.UNIT,
+    );
+  });
+
+  describe("help tool", () => {
+    it(
+      "should provide comprehensive help when spec is loaded",
+      async () => {
+        // Load a test spec first
+        const specPath = resolve(__dirname, "../data/simple-api.yaml");
+        await schemaStore.loadSchema(specPath);
+
+        const server = createTestMcpServer();
+        const config = createTestConfig();
+        registerOpenAPITools(server, config);
+
+        expect(isMcpToolRegistered(server, "help")).toBe(true);
+
+        const result = await callMcpTool(server, "help", {});
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("OpenAPI Context MCP Server Help");
+        expect(result.content[0].text).toContain("Currently Loaded:");
+        expect(result.content[0].text).toContain("Simple Test API");
+        expect(result.content[0].text).toContain("Available Tools");
+        expect(result.content[0].text).toContain("Context-Efficient Usage Patterns");
+        expect(result.content[0].text).toContain("Pro Tips");
+        
+        // Should not show setup instructions when spec is loaded
+        expect(result.content[0].text).not.toContain("Setup Instructions (No Spec Loaded)");
+
+        // Clean up
+        schemaStore.clearSchema();
+      },
+      TIMEOUTS.UNIT,
+    );
+
+    it(
+      "should provide setup instructions when no spec is loaded",
+      async () => {
+        // Ensure no schema is loaded
+        schemaStore.clearSchema();
+
+        const server = createTestMcpServer();
+        const config = createTestConfig();
+        registerOpenAPITools(server, config);
+
+        expect(isMcpToolRegistered(server, "help")).toBe(true);
+
+        const result = await callMcpTool(server, "help", {});
+
+        expect(result.content).toBeDefined();
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("OpenAPI Context MCP Server Help");
+        expect(result.content[0].text).toContain("⚠️ No OpenAPI Spec Currently Loaded");
+        expect(result.content[0].text).toContain("Setup Instructions (No Spec Loaded)");
+        expect(result.content[0].text).toContain("MCP Client Configuration");
+        expect(result.content[0].text).toContain("/app/spec:ro");
+        expect(result.content[0].text).toContain("djankies/openapi-context:latest");
+        expect(result.content[0].text).toContain("Troubleshooting:");
+        expect(result.content[0].text).toContain("Example Paths:");
       },
       TIMEOUTS.UNIT,
     );

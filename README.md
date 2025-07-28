@@ -18,7 +18,10 @@ Provide your LLMs with a way to get the context they need from your OpenAPI spec
     - [6. `get_operation_examples` - Example payloads](#6-get_operation_examples---example-payloads)
     - [7. `get_auth_requirements` - Authentication details](#7-get_auth_requirements---authentication-details)
     - [8. `get_server_info` - API metadata and statistics](#8-get_server_info---api-metadata-and-statistics)
-    - [9. `ping` - Server health check](#9-ping---server-health-check)
+    - [9. `list_tags` - List API categories/tags](#9-list_tags---list-api-categoriestags-)
+    - [10. `get_operation_summary` - Get concise operation overview](#10-get_operation_summary---get-concise-operation-overview-)
+    - [11. `ping` - Server health check](#11-ping---server-health-check)
+    - [12. `help` - Comprehensive server help](#12-help---comprehensive-server-help)
     - [Error Response Example](#error-response-example)
   - [Working with Multiple OpenAPI Specs](#working-with-multiple-openapi-specs)
   - [Environment Variables in MCP Configuration](#environment-variables-in-mcp-configuration)
@@ -30,18 +33,34 @@ Provide your LLMs with a way to get the context they need from your OpenAPI spec
 
 ## Available Tools
 
-1. 📜 `list_operations` - List all API endpoints with filtering
-2. 🩻 `get_operation_details` - Get detailed information about specific endpoints
-3. 📤 `get_request_schema` - Retrieve request body schemas
-4. 📥 `get_response_schema` - Retrieve response schemas by status code
+### Core Tools
+1. 📜 `list_operations` - List all API endpoints with filtering and compact mode
+2. 🩻 `get_operation_details` - Get detailed information about specific endpoints with customizable detail levels
+3. 📤 `get_request_schema` - Retrieve request body schemas with compact formatting options
+4. 📥 `get_response_schema` - Retrieve response schemas by status code with simplified output
 5. 🔍 `search_operations` - Search endpoints by keyword
 6. 📝 `get_operation_examples` - Get example request/response payloads
 7. 🔐 `get_auth_requirements` - Get authentication/security requirements
 8. ℹ️ `get_server_info` - Get API server information and metadata
-9. 🛜 `ping` - Ping the server to check if it is running (helps prevent LLMs from getting stuck)
+
+### Progressive Discovery Tools ✨
+9. 🏷️ `list_tags` - List API categories/tags with operation counts for high-level exploration
+10. 📋 `get_operation_summary` - Get concise operation overview without full schemas
+
+### Utility Tools
+11. 🛜 `ping` - Ping the server to check if it is running (helps prevent LLMs from getting stuck)
+12. ❓ `help` - Get comprehensive help about using this server, including setup instructions
 
 ## Features
 
+### Context Efficiency ✨
+- 🎯 **Progressive Discovery**: Start with high-level API exploration using `list_tags` and `get_operation_summary`
+- 🔧 **Customizable Detail Levels**: Choose between `minimal`, `standard`, or `full` detail in responses
+- 📦 **Compact Mode**: Get simplified schema representations without overwhelming JSON details
+- 🎛️ **Field Selection**: Request only specific fields you need (e.g., just `summary` and `parameters`)
+- 🧹 **Smart Schema Simplification**: Automatically removes duplicate examples, simplifies UUID patterns, and collapses complex `allOf` structures
+
+### Performance & Usability
 - 🧠 Intelligently generated tool descriptions that include context about the loaded spec so your LLM knows what it's working with
 - 📊 Clear error messages with actionable guidance to help your LLM use the tools correctly
 - 🔍 Filter results by tag, method, or path pattern, making it super efficient for your LLM to find what it needs
@@ -98,6 +117,111 @@ For instance, if your spec is located at `~/specs/openapi.yaml`:
 
 > 🚨 **Important:** Make sure you change `/path/to/your/openapi/spec` to the path to your OpenAPI spec file.
 
+## Context-Efficient Usage Patterns 🎯
+
+The MCP server is designed to minimize context pollution while providing exactly the information your LLM needs. Here are recommended usage patterns:
+
+### Progressive API Discovery
+
+Start broad and narrow down your exploration:
+
+```typescript
+// 1. Start with high-level categories
+list_tags()
+// Returns: "Users (12 operations), Orders (8 operations), Auth (3 operations)"
+
+// 2. Browse operations in a category compactly
+list_operations({ filter: "Users", compact: true })
+// Returns: "GET /users - List users\nPOST /users - Create user\n..."
+
+// 3. Get quick overview of specific operations
+get_operation_summary({ operation_id: "createUser" })
+// Returns: "POST /users\nParameters: body: required\nRequired fields: name, email\nAuth: api_key"
+```
+
+### Smart Detail Level Control
+
+Choose the right level of detail for your needs:
+
+```typescript
+// Minimal - Just the essentials
+get_operation_details({ operation_id: "createUser", detail_level: "minimal" })
+// Returns basic info without full schemas
+
+// Standard - Simplified schemas (default)
+get_operation_details({ operation_id: "createUser", detail_level: "standard" })
+// Returns schemas with patterns/examples simplified
+
+// Full - Everything including patterns and examples
+get_operation_details({ operation_id: "createUser", detail_level: "full" })
+// Returns complete schema details
+```
+
+### Selective Field Retrieval
+
+Request only the information you need:
+
+```typescript
+// Get just the parameters and required fields
+get_operation_details({ 
+  operation_id: "createUser", 
+  fields: ["parameters", "requestBody"] 
+})
+
+// Focus on response information only
+get_operation_details({ 
+  operation_id: "createUser", 
+  fields: ["summary", "responses"] 
+})
+```
+
+### Compact Schema Representation
+
+Get schema information without overwhelming JSON:
+
+```typescript
+// Compact mode - shows types without full JSON schemas
+get_request_schema({ operation_id: "createUser", compact: true })
+// Returns: "Type: object { name: string, email: string (uuid), age?: number }"
+// Instead of: Full JSON schema with patterns, examples, descriptions
+
+get_response_schema({ operation_id: "createUser", compact: true })
+// Returns: "200: object { id: string (uuid), name: string }"
+```
+
+### Raw Schema Access
+
+When you need complete schema details:
+
+```typescript
+// Get unsimplified schemas with all patterns and examples
+get_request_schema({ operation_id: "createUser", raw: true })
+get_response_schema({ operation_id: "createUser", raw: true })
+```
+
+### Example: Context Efficiency in Action
+
+**Traditional Approach** (full schema - 50+ lines):
+```typescript
+get_operation_details({ operation_id: "createUser" })
+// Returns: Full JSON schemas with patterns, examples, descriptions...
+```
+
+**Context-Efficient Approach** (5-10 lines):
+```typescript
+// 1. High-level exploration
+list_tags()
+// Returns: "Users (12 operations), Orders (8 operations)"
+
+// 2. Quick operation overview  
+get_operation_summary({ operation_id: "createUser" })
+// Returns: "POST /users\nParameters: body: required\nRequired: name, email\nAuth: api_key"
+
+// 3. Targeted schema info only when needed
+get_request_schema({ operation_id: "createUser", compact: true })
+// Returns: "Type: object { name: string, email: string (uuid), age?: number }"
+```
+
 ## Tool Response Examples
 
 Here are examples of what each MCP tool returns, including their parameters:
@@ -108,6 +232,8 @@ Here are examples of what each MCP tool returns, including their parameters:
 
 - `filter` (optional): Filter results by tag, HTTP method (GET, POST, etc.), or search term
   - Examples: `"user"`, `"POST"`, `"auth"`
+- `compact` (optional): Return minimal output for efficient context usage
+  - Default: `false`
 
 **Example Call:** `list_operations` with `filter: "pet"`
 
@@ -143,6 +269,9 @@ Here are examples of what each MCP tool returns, including their parameters:
 - `operation_id` (optional): Operation ID from the spec (e.g., 'getUser', 'createOrder')
 - `method` (optional): HTTP method in UPPERCASE (GET, POST, PUT, DELETE, PATCH)  
 - `path` (optional): API endpoint path exactly as shown in spec (e.g., '/users/{id}')
+- `detail_level` (optional): Level of detail - `"minimal"`, `"standard"`, or `"full"`
+  - Default: `"standard"`
+- `fields` (optional): Array of specific fields to return (e.g., `["summary", "parameters", "responses"]`)
 
 **Note:** Provide either `operation_id` OR both `method` and `path`
 
@@ -252,6 +381,8 @@ Content-Type: `application/json`
 - `method` (optional): HTTP method
 - `path` (optional): API path
 - `content_type` (optional): Specific content type to return
+- `compact` (optional): Return simplified schema without patterns and excess details
+- `raw` (optional): Return raw unsimplified schema with all details
 
 **Note:** Provide either `operation_id` OR both `method` and `path`
 
@@ -289,6 +420,8 @@ Content-Type: `application/json`
 - `method` (optional): HTTP method
 - `path` (optional): API path
 - `status_code` (optional): Specific status code to return
+- `compact` (optional): Return simplified schema without patterns and excess details
+- `raw` (optional): Return raw unsimplified schema with all details
 
 **Note:** Provide either `operation_id` OR both `method` and `path`
 
@@ -450,7 +583,52 @@ Example: `created_pet`
 - Paths: 6
 ```
 
-### 9. `ping` - Server health check
+### 9. `list_tags` - List API categories/tags ✨
+
+**Parameters:**
+
+- None (no parameters required)
+
+**Example Call:** `list_tags`
+
+**Response:**
+
+```markdown
+**API Tags**
+
+**API:** Petstore API v1.0.0
+
+- **pets** (3 operations)
+- **users** (2 operations)  
+- **auth** (1 operation)
+
+Total: 6 operations across 3 tags
+```
+
+### 10. `get_operation_summary` - Get concise operation overview ✨
+
+**Parameters:**
+
+- `operation_id` (optional): Unique operation identifier
+- `method` (optional): HTTP method
+- `path` (optional): API path
+
+**Note:** Provide either `operation_id` OR both `method` and `path`
+
+**Example Call:** `get_operation_summary` with `operation_id: "createPet"`
+
+**Response:**
+
+```markdown
+**Operation Summary: POST /pets**
+
+**Parameters:** body: required
+**Required:** name, species  
+**Responses:** 201: object, 400: object
+**Auth:** api_key
+```
+
+### 11. `ping` - Server health check
 
 **Parameters:**
 
@@ -469,6 +647,37 @@ Uptime: 45.123 seconds
 Ready to process queries.
 ```
 
+### 12. `help` - Comprehensive server help
+
+**Parameters:**
+
+- None (no parameters required)
+
+**Example Call:** `help`
+
+**Response:**
+
+Provides comprehensive help including:
+- Current server status and loaded spec information
+- Complete list of available tools with descriptions
+- Context-efficient usage patterns and workflows
+- Setup instructions (especially when no spec is loaded)
+- Configuration examples for MCP clients
+- Troubleshooting tips and pro tips
+- Links to resources and documentation
+
+**Key Features:**
+- **Dynamic Content**: Shows different information based on whether a spec is loaded
+- **Setup Guidance**: Provides detailed Docker volume mount instructions when no spec is detected
+- **Usage Patterns**: Explains the progressive discovery workflow for optimal context efficiency
+- **Parameter Guidance**: Details all context-efficient parameters like `compact`, `detail_level`, `fields`, and `raw`
+
+This tool is especially useful when:
+- Setting up the server for the first time
+- No OpenAPI spec is loaded and you need configuration help
+- Learning the optimal workflow for context-efficient API exploration
+- Understanding which tool to use for specific tasks
+
 ### Error Response Example
 
 When no OpenAPI spec is loaded, all tools return:
@@ -483,7 +692,29 @@ No OpenAPI specification has been loaded. To fix this:
 3. The spec will auto-load when the server starts
 
 💡 Make sure your Docker volume mount is configured: `-v "/path/to/your/openapi.yaml:/app/spec:ro"`
+
+📚 **Need detailed setup help?** Call the `help()` tool for comprehensive configuration instructions and troubleshooting tips.
 ```
+
+**Other Error Examples:**
+
+```markdown
+**Operation Not Found**
+
+Operation not found: createUser
+
+💡 Use `list_operations()` to see available operations or call `help()` for usage guidance.
+```
+
+```markdown
+**Missing Parameters**
+
+Please provide either `operation_id` or both `method` and `path`.
+
+💡 Need help with tool usage? Call `help()` for detailed parameter guidance.
+```
+
+**All error messages include guidance to the `help()` tool for comprehensive assistance.**
 
 ## Working with Multiple OpenAPI Specs
 

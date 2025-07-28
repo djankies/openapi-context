@@ -330,7 +330,7 @@ describe("MCP Server Integration Tests", () => {
 
         const result = await callMcpTool(server, "list_operations", {});
         expect(result.content[0].text).toContain("No OpenAPI Spec Available");
-        expect(result.content[0].text).toContain("No OpenAPI Spec Available");
+        expect(result.content[0].text).toContain("Call the `help()` tool");
       },
       TIMEOUTS.INTEGRATION,
     );
@@ -414,6 +414,163 @@ describe("MCP Server Integration Tests", () => {
         expect(true).toBe(true);
 
         // Clean up
+        schemaStore.clearSchema();
+      },
+      TIMEOUTS.INTEGRATION,
+    );
+  });
+
+  describe("New Tools Integration", () => {
+    it(
+      "should support list_tags tool",
+      async () => {
+        await mcpServer.init();
+        const specPath = resolve(__dirname, "../data/simple-api.yaml");
+        await schemaStore.loadSchema(specPath);
+
+        const server = mcpServer.getServer();
+        const result = await callMcpTool(server, "list_tags", {});
+
+        expect(result.content[0].text).toContain("API Tags");
+        expect(result.content[0].text).toContain("Simple Test API");
+
+        schemaStore.clearSchema();
+      },
+      TIMEOUTS.INTEGRATION,
+    );
+
+    it(
+      "should support get_operation_summary tool",
+      async () => {
+        await mcpServer.init();
+        const specPath = resolve(__dirname, "../data/simple-api.yaml");
+        await schemaStore.loadSchema(specPath);
+
+        const server = mcpServer.getServer();
+        const result = await callMcpTool(server, "get_operation_summary", { operation_id: "getHealth" });
+
+        expect(result.content[0].text).toContain("GET /health");
+        expect(result.content[0].text).toContain("**Parameters:**");
+        expect(result.content[0].text).toContain("**Responses:**");
+        expect(result.content[0].text).toContain("**Auth:**");
+
+        schemaStore.clearSchema();
+      },
+      TIMEOUTS.INTEGRATION,
+    );
+
+    it(
+      "should support compact mode in list_operations",
+      async () => {
+        await mcpServer.init();
+        const specPath = resolve(__dirname, "../data/simple-api.yaml");
+        await schemaStore.loadSchema(specPath);
+
+        const server = mcpServer.getServer();
+        const result = await callMcpTool(server, "list_operations", { compact: true });
+
+        expect(result.content[0].text).toContain("Available API Operations");
+        // Compact mode should be shorter (no detailed info)
+        expect(result.content[0].text).not.toContain("ID:");
+        expect(result.content[0].text).not.toContain("Content Types:");
+
+        schemaStore.clearSchema();
+      },
+      TIMEOUTS.INTEGRATION,
+    );
+
+    it(
+      "should support detail levels in get_operation_details",
+      async () => {
+        await mcpServer.init();
+        const specPath = resolve(__dirname, "../data/simple-api.yaml");
+        await schemaStore.loadSchema(specPath);
+
+        const server = mcpServer.getServer();
+
+        // Test minimal detail level
+        const minimalResult = await callMcpTool(server, "get_operation_details", {
+          operation_id: "postEcho",
+          detail_level: "minimal",
+        });
+
+        expect(minimalResult.content[0].text).toContain("POST /echo");
+        expect(minimalResult.content[0].text).toContain("**Parameters:**");
+        expect(minimalResult.content[0].text).toContain("**Required:**");
+        // Should not contain full schemas
+        expect(minimalResult.content[0].text).not.toContain("```json");
+
+        schemaStore.clearSchema();
+      },
+      TIMEOUTS.INTEGRATION,
+    );
+
+    it(
+      "should support field selection in get_operation_details",
+      async () => {
+        await mcpServer.init();
+        const specPath = resolve(__dirname, "../data/simple-api.yaml");
+        await schemaStore.loadSchema(specPath);
+
+        const server = mcpServer.getServer();
+        const result = await callMcpTool(server, "get_operation_details", {
+          operation_id: "getHealth",
+          fields: ["summary", "responses"],
+        });
+
+        expect(result.content[0].text).toContain("**Summary:**");
+        expect(result.content[0].text).toContain("**Response Schemas:**");
+        // Should not contain other fields
+        expect(result.content[0].text).not.toContain("**Operation ID:**");
+        expect(result.content[0].text).not.toContain("**Tags:**");
+
+        schemaStore.clearSchema();
+      },
+      TIMEOUTS.INTEGRATION,
+    );
+
+    it(
+      "should support compact mode in schema tools",
+      async () => {
+        await mcpServer.init();
+        const specPath = resolve(__dirname, "../data/simple-api.yaml");
+        await schemaStore.loadSchema(specPath);
+
+        const server = mcpServer.getServer();
+        const result = await callMcpTool(server, "get_request_schema", {
+          operation_id: "postEcho",
+          compact: true,
+        });
+
+        expect(result.content[0].text).toContain("Request Schema for POST /echo");
+        expect(result.content[0].text).toContain("Type:");
+        expect(result.content[0].text).toContain("Required:");
+        // Should not contain full JSON schema
+        expect(result.content[0].text).not.toContain("```json");
+
+        schemaStore.clearSchema();
+      },
+      TIMEOUTS.INTEGRATION,
+    );
+
+    it(
+      "should support help tool with dynamic content",
+      async () => {
+        await mcpServer.init();
+        const specPath = resolve(__dirname, "../data/simple-api.yaml");
+        await schemaStore.loadSchema(specPath);
+
+        const server = mcpServer.getServer();
+        const result = await callMcpTool(server, "help", {});
+
+        expect(result.content[0].text).toContain("OpenAPI Context MCP Server Help");
+        expect(result.content[0].text).toContain("Currently Loaded:");
+        expect(result.content[0].text).toContain("Simple Test API");
+        expect(result.content[0].text).toContain("Available Tools");
+        
+        // Should not show setup instructions when spec is loaded
+        expect(result.content[0].text).not.toContain("Setup Instructions (No Spec Loaded)");
+
         schemaStore.clearSchema();
       },
       TIMEOUTS.INTEGRATION,
