@@ -1,5 +1,14 @@
 # Multi-stage Docker build for OpenAPI Context MCP Server
 FROM node:18-alpine AS builder
+
+# Add metadata labels
+LABEL org.opencontainers.image.title="OpenAPI Context MCP Server"
+LABEL org.opencontainers.image.description="MCP server for querying OpenAPI 3.1 specifications with 8 tools for endpoint discovery, schema retrieval, and API exploration"
+LABEL org.opencontainers.image.url="https://hub.docker.com/r/djankies/openapi-context"
+LABEL org.opencontainers.image.source="https://github.com/djankies/openapi-context"
+LABEL org.opencontainers.image.documentation="https://github.com/djankies/openapi-context/blob/main/README.md"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.vendor="Daniel Jankowski"
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
