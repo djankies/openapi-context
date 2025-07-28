@@ -7,6 +7,7 @@ Provide your LLMs with a way to get the context they need from your OpenAPI spec
   - [Features](#features)
   - [Supported File Formats](#supported-file-formats)
   - [Quick Start](#quick-start)
+    - [Docker Setup](#docker-setup)
     - [MCP Client Configuration](#mcp-client-configuration)
   - [Tool Response Examples](#tool-response-examples)
     - [1. `list_operations` - List all endpoints](#1-list_operations---list-all-endpoints)
@@ -52,6 +53,10 @@ Provide your LLMs with a way to get the context they need from your OpenAPI spec
 - File extensions: `.yaml`, `.yml`, `.json`
 
 ## Quick Start
+
+### Docker Setup
+
+Download and install Docker from [the Docker website](https://docs.docker.com/get-started/get-docker/). Make sure you start the docker engine before running the mcp server.
 
 ### MCP Client Configuration
 

@@ -5,9 +5,6 @@
 
 set -e
 
-# Initialize the specs directory if it doesn't exist
-mkdir -p /app/specs
-
 # Determine mode based on environment variable or arguments
 if [ "$1" = "http" ] || [ "$MCP_MODE" = "http" ]; then
     echo "Starting OpenAPI Context MCP Server in HTTP mode..." >&2
