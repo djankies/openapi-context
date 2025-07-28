@@ -2,27 +2,15 @@
 
 Provide your LLMs with a way to get the context they need from your OpenAPI specs, efficiently, and without polluting context. This server automatically loads OpenAPI specs and provides intelligent tools for LLMs to understand and work with APIs.
 
+## Table of Contents
+
 - [OpenAPI Context MCP Server](#openapi-context-mcp-server)
   - [Available Tools](#available-tools)
   - [Features](#features)
   - [Supported File Formats](#supported-file-formats)
   - [Quick Start](#quick-start)
-    - [Docker Setup](#docker-setup)
-    - [MCP Client Configuration](#mcp-client-configuration)
+  - [Context-Efficient Usage Patterns 🎯](#context-efficient-usage-patterns-)
   - [Tool Response Examples](#tool-response-examples)
-    - [1. `list_operations` - List all endpoints](#1-list_operations---list-all-endpoints)
-    - [2. `get_operation_details` - Detailed endpoint information](#2-get_operation_details---detailed-endpoint-information)
-    - [3. `search_operations` - Find endpoints by keyword](#3-search_operations---find-endpoints-by-keyword)
-    - [4. `get_request_schema` - Request body schema](#4-get_request_schema---request-body-schema)
-    - [5. `get_response_schema` - Response schema by status code](#5-get_response_schema---response-schema-by-status-code)
-    - [6. `get_operation_examples` - Example payloads](#6-get_operation_examples---example-payloads)
-    - [7. `get_auth_requirements` - Authentication details](#7-get_auth_requirements---authentication-details)
-    - [8. `get_server_info` - API metadata and statistics](#8-get_server_info---api-metadata-and-statistics)
-    - [9. `list_tags` - List API categories/tags](#9-list_tags---list-api-categoriestags-)
-    - [10. `get_operation_summary` - Get concise operation overview](#10-get_operation_summary---get-concise-operation-overview-)
-    - [11. `ping` - Server health check](#11-ping---server-health-check)
-    - [12. `help` - Comprehensive server help](#12-help---comprehensive-server-help)
-    - [Error Response Example](#error-response-example)
   - [Working with Multiple OpenAPI Specs](#working-with-multiple-openapi-specs)
   - [Environment Variables in MCP Configuration](#environment-variables-in-mcp-configuration)
   - [HTTP Mode for Development and Testing](#http-mode-for-development-and-testing)
@@ -34,33 +22,40 @@ Provide your LLMs with a way to get the context they need from your OpenAPI spec
 ## Available Tools
 
 ### Core Tools
-1. 📜 `list_operations` - List all API endpoints with filtering and compact mode
-2. 🩻 `get_operation_details` - Get detailed information about specific endpoints with customizable detail levels
-3. 📤 `get_request_schema` - Retrieve request body schemas with compact formatting options
-4. 📥 `get_response_schema` - Retrieve response schemas by status code with simplified output
-5. 🔍 `search_operations` - Search endpoints by keyword
-6. 📝 `get_operation_examples` - Get example request/response payloads
-7. 🔐 `get_auth_requirements` - Get authentication/security requirements
-8. ℹ️ `get_server_info` - Get API server information and metadata
+
+- 📜 `list_operations` - List all API endpoints with filtering and compact mode
+- 🩻 `get_operation_details` - Get detailed information about specific endpoints with customizable detail levels
+- 📤 `get_request_schema` - Retrieve request body schemas with **pagination** and compact formatting options
+- 📥 `get_response_schema` - Retrieve response schemas by status code with **pagination** and simplified output
+- 🔍 `search_operations` - Search endpoints by keyword
+- 📝 `get_operation_examples` - Get example request/response payloads
+- 🔐 `get_auth_requirements` - Get authentication/security requirements with **implementation examples**
+- ℹ️ `get_server_info` - Get API server information and metadata
 
 ### Progressive Discovery Tools ✨
-9. 🏷️ `list_tags` - List API categories/tags with operation counts for high-level exploration
-10. 📋 `get_operation_summary` - Get concise operation overview without full schemas
+
+- 🏷️ `list_tags` - List API categories/tags with operation counts for high-level exploration
+- 📋 `get_operation_summary` - Get concise operation overview without full schemas
 
 ### Utility Tools
-11. 🛜 `ping` - Ping the server to check if it is running (helps prevent LLMs from getting stuck)
-12. ❓ `help` - Get comprehensive help about using this server, including setup instructions
+
+- 🛜 `ping` - Ping the server to check if it is running (helps prevent LLMs from getting stuck)
+- ❓ `help` - Get comprehensive help about using this server, including setup instructions
 
 ## Features
 
 ### Context Efficiency ✨
+
 - 🎯 **Progressive Discovery**: Start with high-level API exploration using `list_tags` and `get_operation_summary`
 - 🔧 **Customizable Detail Levels**: Choose between `minimal`, `standard`, or `full` detail in responses
 - 📦 **Compact Mode**: Get simplified schema representations without overwhelming JSON details
 - 🎛️ **Field Selection**: Request only specific fields you need (e.g., just `summary` and `parameters`)
+- 📄 **Schema Pagination**: Large schemas are automatically chunked into 2000-character segments with smart JSON boundary detection
+- 🔢 **Intelligent Enum Truncation**: Large enums are smartly truncated (≤5 show all, 6-100 show first 3, 100+ show count only)
 - 🧹 **Smart Schema Simplification**: Automatically removes duplicate examples, simplifies UUID patterns, and collapses complex `allOf` structures
 
 ### Performance & Usability
+
 - 🧠 Intelligently generated tool descriptions that include context about the loaded spec so your LLM knows what it's working with
 - 📊 Clear error messages with actionable guidance to help your LLM use the tools correctly
 - 🔍 Filter results by tag, method, or path pattern, making it super efficient for your LLM to find what it needs
@@ -202,12 +197,14 @@ get_response_schema({ operation_id: "createUser", raw: true })
 ### Example: Context Efficiency in Action
 
 **Traditional Approach** (full schema - 50+ lines):
+
 ```typescript
 get_operation_details({ operation_id: "createUser" })
 // Returns: Full JSON schemas with patterns, examples, descriptions...
 ```
 
 **Context-Efficient Approach** (5-10 lines):
+
 ```typescript
 // 1. High-level exploration
 list_tags()
@@ -383,6 +380,8 @@ Content-Type: `application/json`
 - `content_type` (optional): Specific content type to return
 - `compact` (optional): Return simplified schema without patterns and excess details
 - `raw` (optional): Return raw unsimplified schema with all details
+- `index` (optional): Character index to start reading from (for pagination of large schemas)
+- `chunk_size` (optional): Size of each chunk for pagination (default: 2000 characters)
 
 **Note:** Provide either `operation_id` OR both `method` and `path`
 
@@ -422,6 +421,8 @@ Content-Type: `application/json`
 - `status_code` (optional): Specific status code to return
 - `compact` (optional): Return simplified schema without patterns and excess details
 - `raw` (optional): Return raw unsimplified schema with all details
+- `index` (optional): Character index to start reading from (for pagination of large schemas)
+- `chunk_size` (optional): Size of each chunk for pagination (default: 2000 characters)
 
 **Note:** Provide either `operation_id` OR both `method` and `path`
 
@@ -546,9 +547,12 @@ Example: `created_pet`
   - Scopes: read:pets, write:pets
 
 **Available Security Schemes:**
-- **bearerAuth**: http
+- **bearerAuth** (http)
+  - Implementation: `Authorization: Bearer <token>`
+  - Token Format: JWT
   - Description: JWT Bearer token authentication
-- **apiKey**: apiKey  
+- **apiKey** (apiKey)
+  - Implementation: `X-API-Key: <key>` (header)
   - Description: API key in header
 ```
 
@@ -658,6 +662,7 @@ Ready to process queries.
 **Response:**
 
 Provides comprehensive help including:
+
 - Current server status and loaded spec information
 - Complete list of available tools with descriptions
 - Context-efficient usage patterns and workflows
@@ -667,12 +672,14 @@ Provides comprehensive help including:
 - Links to resources and documentation
 
 **Key Features:**
+
 - **Dynamic Content**: Shows different information based on whether a spec is loaded
 - **Setup Guidance**: Provides detailed Docker volume mount instructions when no spec is detected
 - **Usage Patterns**: Explains the progressive discovery workflow for optimal context efficiency
 - **Parameter Guidance**: Details all context-efficient parameters like `compact`, `detail_level`, `fields`, and `raw`
 
 This tool is especially useful when:
+
 - Setting up the server for the first time
 - No OpenAPI spec is loaded and you need configuration help
 - Learning the optimal workflow for context-efficient API exploration
@@ -872,6 +879,7 @@ This project uses [Husky](https://typicode.github.io/husky/) for Git hooks to en
 - **Auto-setup**: Hooks are automatically installed when you run `npm install`
 
 The pre-commit hook runs:
+
 1. `npm run type-check` - TypeScript type checking
 2. `npm run lint` - ESLint code quality checks  
 3. `npm run format:check` - Prettier formatting verification
