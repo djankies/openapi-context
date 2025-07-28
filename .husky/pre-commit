@@ -1,0 +1,2 @@
+echo "🔍 Running pre-commit quality checks..."
+npm run ci

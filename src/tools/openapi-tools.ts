@@ -129,7 +129,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
               type: "text" as const,
               text: filter
                 ? `**No Operations Found**\n\nNo operations found matching filter: "${filter}"\n\n💡 Try a different filter term or call \`help()\` for search tips.`
-                : "**No Operations Found**\n\nThe loaded schema contains no operations.\n\n💡 Check your OpenAPI spec or call \`help()\` for troubleshooting.",
+                : "**No Operations Found**\n\nThe loaded schema contains no operations.\n\n💡 Check your OpenAPI spec or call `help()` for troubleshooting.",
             },
           ],
         };
@@ -1137,14 +1137,15 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
   );
 
   // Tool 12: Help
-  const helpDescription = "Get comprehensive help about using this OpenAPI Context MCP Server, including setup instructions and available tools.";
+  const helpDescription =
+    "Get comprehensive help about using this OpenAPI Context MCP Server, including setup instructions and available tools.";
   server.tool("help", helpDescription, HelpSchema, async () => {
     try {
       const metadata = schemaStore.getMetadata();
       const hasSchema = schemaStore.hasSchema();
-      
+
       let helpText = "# OpenAPI Context MCP Server Help\n\n";
-      
+
       if (hasSchema && metadata) {
         helpText += `**Currently Loaded:** ${metadata.title} v${metadata.version}\n`;
         helpText += `**Operations Available:** ${schemaStore.getOperations().length}\n`;
@@ -1152,30 +1153,30 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
       } else {
         helpText += "**⚠️ No OpenAPI Spec Currently Loaded**\n\n";
       }
-      
+
       helpText += "## What This Server Does\n\n";
       helpText += "This MCP server provides intelligent, context-efficient access to OpenAPI 3.1 specifications. ";
       helpText += "It helps LLMs understand and work with APIs without overwhelming context pollution.\n\n";
-      
+
       helpText += "## Available Tools\n\n";
       helpText += "### 📋 Core Discovery Tools\n";
       helpText += "- **`list_operations`** - List all endpoints (use `compact=true` for minimal output)\n";
       helpText += "- **`search_operations`** - Search endpoints by keyword\n";
       helpText += "- **`list_tags`** - High-level API exploration by categories\n";
       helpText += "- **`get_operation_summary`** - Quick operation overview without full schemas\n\n";
-      
+
       helpText += "### 🔍 Detailed Information Tools\n";
       helpText += "- **`get_operation_details`** - Full endpoint details (supports `detail_level` and `fields` selection)\n";
       helpText += "- **`get_request_schema`** - Request body schemas (use `compact=true` for simplified format)\n";
       helpText += "- **`get_response_schema`** - Response schemas (use `compact=true` for simplified format)\n";
       helpText += "- **`get_operation_examples`** - Example request/response payloads\n\n";
-      
+
       helpText += "### ⚙️ Server Management Tools\n";
       helpText += "- **`get_auth_requirements`** - Authentication/security requirements\n";
       helpText += "- **`get_server_info`** - API server information and statistics\n";
       helpText += "- **`ping`** - Server health check\n";
       helpText += "- **`help`** - This help information\n\n";
-      
+
       helpText += "## Context-Efficient Usage Patterns 🎯\n\n";
       helpText += "**Recommended Workflow:**\n";
       helpText += "1. Start with `list_tags()` for high-level exploration\n";
@@ -1183,13 +1184,13 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
       helpText += "3. Get quick overviews with `get_operation_summary(operation_id='...')`\n";
       helpText += "4. Drill down with `get_operation_details(operation_id='...', detail_level='minimal')` \n";
       helpText += "5. Get schemas only when needed with `compact=true`\n\n";
-      
+
       helpText += "**Key Parameters for Context Efficiency:**\n";
       helpText += "- `compact=true` - Simplified, readable output instead of full JSON\n";
       helpText += "- `detail_level='minimal'` - Essential info only (vs 'standard' or 'full')\n";
       helpText += "- `fields=['summary','parameters']` - Select only needed fields\n";
       helpText += "- `raw=true` - Get complete unfiltered schemas when absolutely necessary\n\n";
-      
+
       if (!hasSchema) {
         helpText += "## 🔧 Setup Instructions (No Spec Loaded)\n\n";
         helpText += "To load an OpenAPI specification, you need to mount your spec file to the container:\n\n";
@@ -1202,8 +1203,8 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
         helpText += '      "run", "--rm", "-i",\n';
         helpText += '      "-v", "/path/to/your/openapi.yaml:/app/spec:ro",\n';
         helpText += '      "djankies/openapi-context:latest"\n';
-        helpText += '    ]\n';
-        helpText += '  }\n';
+        helpText += "    ]\n";
+        helpText += "  }\n";
         helpText += "}\n";
         helpText += "```\n\n";
         helpText += "**Important Notes:**\n";
@@ -1212,32 +1213,32 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
         helpText += "- Supported formats: `.yaml`, `.yml`, `.json`\n";
         helpText += "- The server will automatically load the spec when it starts\n";
         helpText += "- Restart your MCP client after updating the configuration\n\n";
-        
+
         helpText += "**Example Paths:**\n";
         helpText += "- macOS/Linux: `~/specs/api.yaml:/app/spec:ro`\n";
         helpText += "- Windows: `C:/Users/YourName/specs/api.yaml:/app/spec:ro`\n\n";
-        
+
         helpText += "**Troubleshooting:**\n";
         helpText += "- Make sure the file path exists and is readable\n";
         helpText += "- Check that your OpenAPI spec is valid YAML/JSON\n";
         helpText += "- Use `get_server_info()` to check if the spec loaded successfully\n";
         helpText += "- Check Docker logs if the container fails to start\n\n";
       }
-      
+
       helpText += "## 💡 Pro Tips\n\n";
       helpText += "- Always start with `list_tags()` or `list_operations(compact=true)` for efficiency\n";
       helpText += "- Use `search_operations(query='keyword')` to find specific functionality\n";
       helpText += "- The `get_operation_summary()` tool is perfect for quick API understanding\n";
       helpText += "- Only use `detail_level='full'` or `raw=true` when you need complete details\n";
       helpText += "- Combine `fields` parameter to get exactly what you need\n\n";
-      
+
       helpText += "## 🔗 Resources\n\n";
       helpText += "- **GitHub:** https://github.com/djankies/openapi-context\n";
       helpText += "- **Docker Hub:** https://hub.docker.com/r/djankies/openapi-context\n";
       helpText += "- **OpenAPI 3.1 Spec:** https://spec.openapis.org/oas/v3.1.0\n\n";
-      
+
       helpText += "Need more help? Use the individual tools with invalid parameters to see their specific usage instructions!";
-      
+
       return {
         content: [
           {

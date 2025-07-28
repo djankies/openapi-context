@@ -567,7 +567,7 @@ describe("MCP Server Integration Tests", () => {
         expect(result.content[0].text).toContain("Currently Loaded:");
         expect(result.content[0].text).toContain("Simple Test API");
         expect(result.content[0].text).toContain("Available Tools");
-        
+
         // Should not show setup instructions when spec is loaded
         expect(result.content[0].text).not.toContain("Setup Instructions (No Spec Loaded)");
 

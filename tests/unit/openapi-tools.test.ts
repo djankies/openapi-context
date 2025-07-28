@@ -465,7 +465,7 @@ describe("OpenAPI Tools", () => {
         expect(result.content[0].text).toContain("Available Tools");
         expect(result.content[0].text).toContain("Context-Efficient Usage Patterns");
         expect(result.content[0].text).toContain("Pro Tips");
-        
+
         // Should not show setup instructions when spec is loaded
         expect(result.content[0].text).not.toContain("Setup Instructions (No Spec Loaded)");
 
