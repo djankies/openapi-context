@@ -1,0 +1,78 @@
+openapi: 3.1.0
+info:
+  title: Simple Test API
+  description: A minimal API for testing
+  version: 1.0.0
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      description: Returns the health status of the API
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+                required:
+                  - status
+                  - timestamp
+
+  /echo:
+    post:
+      operationId: postEcho
+      summary: Echo endpoint
+      description: Returns the posted data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  maxLength: 1000
+              required:
+                - message
+            examples:
+              simple:
+                summary: Simple echo
+                value:
+                  message: "Hello, world!"
+      responses:
+        "200":
+          description: Echo response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  echo:
+                    type: string
+                  receivedAt:
+                    type: string
+                    format: date-time
+                required:
+                  - echo
+                  - receivedAt
+              examples:
+                simple:
+                  summary: Simple echo response
+                  value:
+                    echo: "Hello, world!"
+                    receivedAt: "2023-01-01T12:00:00Z"

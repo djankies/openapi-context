@@ -1,6 +1,9 @@
 # Multi-stage Docker build for OpenAPI Context MCP Server
 FROM node:22-alpine AS builder
 
+# Update npm to fix security vulnerabilities
+RUN npm install -g npm@latest
+
 # Add metadata labels
 LABEL org.opencontainers.image.title="OpenAPI Context MCP Server"
 LABEL org.opencontainers.image.description="MCP server for querying OpenAPI 3.1 specifications with 8 tools for endpoint discovery, schema retrieval, and API exploration"
@@ -14,6 +17,10 @@ COPY package*.json ./
 RUN npm ci --only=production
 
 FROM node:22-alpine AS development
+
+# Update npm to fix security vulnerabilities
+RUN npm install -g npm@latest
+
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -23,6 +30,10 @@ COPY tsconfig.json ./
 RUN npm run build
 
 FROM node:22-alpine AS production
+
+# Update npm to fix security vulnerabilities (though not used in production)
+RUN npm install -g npm@latest
+
 WORKDIR /app
 
 # Install curl for health checks
@@ -33,9 +44,11 @@ RUN addgroup -g 1001 -S nodejs
 RUN adduser -S mcp -u 1001
 
 # Copy built application
-COPY --from=builder /app/node_modules ./node_modules
 COPY --from=development /app/dist ./dist
 COPY package*.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production
 
 # Set proper permissions for app directory
 RUN chown -R mcp:nodejs /app
