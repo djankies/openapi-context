@@ -375,8 +375,8 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
 
   // Tool 4: Get Request Schema
   const getRequestSchemaDescription = specInfo
-    ? `Get request body schema from ${specInfo}. Shows JSON schema with types, required fields, and constraints. Use compact=true for simplified schema format, raw=true for full details.`
-    : "Get request body schema (no spec loaded). Shows JSON schema with types, required fields, and constraints. Use compact=true for simplified schema format, raw=true for full details.";
+    ? `Get request body schema from ${specInfo}. Shows JSON schema with types, required fields, and constraints. Use compact=true for simplified schema format, raw=true for full details. Large schemas are automatically paginated; use index and chunk_size for navigation.`
+    : "Get request body schema (no spec loaded). Shows JSON schema with types, required fields, and constraints. Use compact=true for simplified schema format, raw=true for full details. Large schemas are automatically paginated; use index and chunk_size for navigation.";
 
   server.tool(
     "get_request_schema",
@@ -490,11 +490,12 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
           }
         }
 
-        // Apply pagination if index is provided or chunk_size is specified
-        if (index !== undefined || chunk_size !== undefined) {
+        // Apply pagination if content exceeds chunk size or index is provided
+        const effectiveChunkSize = chunk_size || 2000;
+        if (result.length > effectiveChunkSize || index !== undefined) {
           const paginated = paginateContent(result, {
             startIndex: index || 0,
-            chunkSize: chunk_size || 2000,
+            chunkSize: effectiveChunkSize,
             smartBreaks: true,
           });
 
@@ -532,8 +533,8 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
 
   // Tool 5: Get Response Schema
   const getResponseSchemaDescription = specInfo
-    ? `Get response schemas from ${specInfo} by status code. Shows JSON schema for successful (200) and error responses. Use compact=true for simplified schema format, raw=true for full details.`
-    : "Get response schemas (no spec loaded) by status code. Shows JSON schema for successful (200) and error responses. Use compact=true for simplified schema format, raw=true for full details.";
+    ? `Get response schemas from ${specInfo} by status code. Shows JSON schema for successful (200) and error responses. Use compact=true for simplified schema format, raw=true for full details. Large schemas are automatically paginated; use index and chunk_size for navigation.`
+    : "Get response schemas (no spec loaded) by status code. Shows JSON schema for successful (200) and error responses. Use compact=true for simplified schema format, raw=true for full details. Large schemas are automatically paginated; use index and chunk_size for navigation.";
 
   server.tool(
     "get_response_schema",
@@ -646,11 +647,12 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
           }
         }
 
-        // Apply pagination if index is provided or chunk_size is specified
-        if (index !== undefined || chunk_size !== undefined) {
+        // Apply pagination if content exceeds chunk size or index is provided
+        const effectiveChunkSize = chunk_size || 2000;
+        if (result.length > effectiveChunkSize || index !== undefined) {
           const paginated = paginateContent(result, {
             startIndex: index || 0,
-            chunkSize: chunk_size || 2000,
+            chunkSize: effectiveChunkSize,
             smartBreaks: true,
           });
 

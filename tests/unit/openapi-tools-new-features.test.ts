@@ -97,11 +97,30 @@ describe("OpenAPI Tools - New Features", () => {
           chunk_size: 5000, // Large chunk to contain everything
         });
 
-        // Assert
+        // Assert - With new logic, pagination is not applied for small content
         const text = result.content[0].text;
-        expect(text).toContain("📄 Showing complete content");
+        expect(text).toContain("Request Body Schema");
+        expect(text).not.toContain("📄 Showing");
         expect(text).not.toContain("Next chunk");
         expect(text).not.toContain("Previous chunk");
+      });
+
+      it("should automatically paginate when content exceeds chunk size", async () => {
+        // Arrange
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, createTestConfig());
+
+        // Act - Use very small chunk size to force automatic pagination
+        const result = await callMcpTool(server, "get_request_schema", {
+          operation_id: "postEcho",
+          chunk_size: 50, // Small chunk to force pagination
+        });
+
+        // Assert
+        const text = result.content[0].text;
+        expect(text).toContain("📄 Showing characters");
+        expect(text).toContain("⏭️  Next chunk: Use index=");
+        expect(text).not.toContain("📄 Showing complete content");
       });
 
       it("should respect custom chunk_size parameter", async () => {
@@ -201,6 +220,24 @@ describe("OpenAPI Tools - New Features", () => {
         // Assert
         const text = result.content[0].text;
         expect(text).toContain("Response Schema for 200");
+      });
+
+      it("should automatically paginate response schemas when content exceeds chunk size", async () => {
+        // Arrange
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, createTestConfig());
+
+        // Act - Use very small chunk size without index to test automatic pagination
+        const result = await callMcpTool(server, "get_response_schema", {
+          operation_id: "getHealth",
+          chunk_size: 30, // Very small to force pagination
+        });
+
+        // Assert
+        const text = result.content[0].text;
+        expect(text).toContain("📄 Showing characters");
+        expect(text).toContain("⏭️  Next chunk: Use index=");
+        expect(text).not.toContain("📄 Showing complete content");
       });
     });
   });
