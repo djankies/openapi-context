@@ -6,7 +6,7 @@ RUN npm install -g npm@latest
 
 # Add metadata labels
 LABEL org.opencontainers.image.title="OpenAPI Context MCP Server"
-LABEL org.opencontainers.image.description="MCP server for querying OpenAPI 3.1 specifications with 8 tools for endpoint discovery, schema retrieval, and API exploration"
+LABEL org.opencontainers.image.description="MCP server for querying OpenAPI 3.1 specifications with 13 tools for endpoint discovery, schema retrieval, header inspection, and API exploration"
 LABEL org.opencontainers.image.url="https://hub.docker.com/r/djankies/openapi-context"
 LABEL org.opencontainers.image.source="https://github.com/djankies/openapi-context"
 LABEL org.opencontainers.image.documentation="https://github.com/djankies/openapi-context/blob/main/README.md"
