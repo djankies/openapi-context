@@ -175,6 +175,10 @@ dist
 # Build artifacts
 dist/
 *.tsbuildinfo
+.claude/
+hooks/
+CLAUDE.md
+TEST_PLAN.md
 
 # Test artifacts
 test-data/

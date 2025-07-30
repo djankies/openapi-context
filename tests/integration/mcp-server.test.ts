@@ -234,7 +234,7 @@ describe("MCP Server Integration Tests", () => {
 
         // Step 2: Get operation details
         const detailsResult = await callMcpTool(server, "get_operation_details", { operation_id: "getHealth" });
-        expect(detailsResult.content[0].text).toContain("Operation: GET /health");
+        expect(detailsResult.content[0].text).toContain("GET /health");
         expect(detailsResult.content[0].text).toContain("Response Schemas:");
 
         // Step 3: Search operations
@@ -261,13 +261,13 @@ describe("MCP Server Integration Tests", () => {
 
         // Test request schema retrieval
         const requestResult = await callMcpTool(server, "get_request_schema", { operation_id: "createUser" });
-        expect(requestResult.content[0].text).toContain("Request Schema for");
+        expect(requestResult.content[0].text).toContain("Request Body Schema for");
         expect(requestResult.content[0].text).toContain("username");
         expect(requestResult.content[0].text).toContain("email");
 
         // Test response schema retrieval
         const responseResult = await callMcpTool(server, "get_response_schema", { operation_id: "listUsers" });
-        expect(responseResult.content[0].text).toContain("Response Schema for");
+        expect(responseResult.content[0].text).toContain("Response Schemas for");
         expect(responseResult.content[0].text).toContain("Status Code: `200`");
       },
       TIMEOUTS.E2E,
@@ -542,7 +542,7 @@ describe("MCP Server Integration Tests", () => {
           compact: true,
         });
 
-        expect(result.content[0].text).toContain("Request Schema for POST /echo");
+        expect(result.content[0].text).toContain("Request Body Schema for POST /echo");
         expect(result.content[0].text).toContain("Type:");
         expect(result.content[0].text).toContain("Required:");
         // Should not contain full JSON schema

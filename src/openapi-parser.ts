@@ -110,7 +110,7 @@ export function extractOperations(api: any): ParsedOperation[] {
 
       operations.push({
         operationId: operation.operationId || `${method}_${path.replace(/[{}]/g, "")}`,
-        method: method.toUpperCase(),
+        method: method.toLowerCase(),
         path,
         summary: operation.summary || "",
         description: operation.description || "",

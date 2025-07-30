@@ -203,13 +203,13 @@ describe("OpenAPI Parser", () => {
 
       const healthOp = operations.find((op) => op.operationId === "getHealth");
       expect(healthOp).toBeDefined();
-      expect(healthOp?.method).toBe("GET");
+      expect(healthOp?.method).toBe("get");
       expect(healthOp?.path).toBe("/health");
       expect(healthOp?.summary).toBe("Health check");
 
       const echoOp = operations.find((op) => op.operationId === "postEcho");
       expect(echoOp).toBeDefined();
-      expect(echoOp?.method).toBe("POST");
+      expect(echoOp?.method).toBe("post");
       expect(echoOp?.path).toBe("/echo");
       expect(echoOp?.requestBody).toBeDefined();
     });
@@ -224,14 +224,14 @@ describe("OpenAPI Parser", () => {
 
       const listUsersOp = operations.find((op) => op.operationId === "listUsers");
       expect(listUsersOp).toBeDefined();
-      expect(listUsersOp?.method).toBe("GET");
+      expect(listUsersOp?.method).toBe("get");
       expect(listUsersOp?.path).toBe("/users");
       expect(listUsersOp?.parameters).toBeDefined();
       expect(listUsersOp?.security).toBeDefined();
 
       const createUserOp = operations.find((op) => op.operationId === "createUser");
       expect(createUserOp).toBeDefined();
-      expect(createUserOp?.method).toBe("POST");
+      expect(createUserOp?.method).toBe("post");
       expect(createUserOp?.requestBody).toBeDefined();
     });
 
@@ -253,7 +253,7 @@ describe("OpenAPI Parser", () => {
 
       expect(operations).toHaveLength(1);
       expect(operations[0].operationId).toBe("get_/test");
-      expect(operations[0].method).toBe("GET");
+      expect(operations[0].method).toBe("get");
     });
   });
 

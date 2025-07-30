@@ -217,7 +217,7 @@ describe("OpenAPI Tools", () => {
 
         expect(result.content).toBeDefined();
         expect(result.content[0].type).toBe("text");
-        expect(result.content[0].text).toContain("Request Schema for POST /echo");
+        expect(result.content[0].text).toContain("Request Body Schema for POST /echo");
         expect(result.content[0].text).toContain("Content-Type: `application/json`");
         expect(result.content[0].text).toContain('"type": "object"');
         expect(result.content[0].text).toContain('"message"');
@@ -273,7 +273,7 @@ describe("OpenAPI Tools", () => {
 
         expect(result.content).toBeDefined();
         expect(result.content[0].type).toBe("text");
-        expect(result.content[0].text).toContain("Response Schema for GET /health");
+        expect(result.content[0].text).toContain("Response Schemas for GET /health");
         expect(result.content[0].text).toContain("Status Code: `200`");
         expect(result.content[0].text).toContain("Content-Type: `application/json`");
         expect(result.content[0].text).toContain('"status"');

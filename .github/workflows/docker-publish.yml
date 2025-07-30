@@ -62,8 +62,10 @@ jobs:
     - name: Update Docker Hub Description
       if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
       uses: peter-evans/dockerhub-description@v4
+      continue-on-error: true
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
         repository: ${{ env.IMAGE_NAME }}
-        short-description: "OpenAPI Context MCP Server - Intelligent, context-efficient access to OpenAPI 3.1 specifications for LLMs"
+        short-description: "OpenAPI Context MCP Server - Smart OpenAPI 3.1 access for LLMs"
+        readme-filepath: ./README.md

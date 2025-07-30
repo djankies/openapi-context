@@ -114,7 +114,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
 
   // Generate dynamic descriptions based on loaded spec
   const metadata = schemaStore.getMetadata();
-  const specInfo = metadata ? `${metadata.title} v${metadata.version}` : "OpenAPI spec";
+  const specInfo = metadata ? `${metadata.title} v${metadata.version}` : null;
   const operationCount = metadata ? ` (${schemaStore.getOperations().length} operations)` : "";
 
   // Tool 1: List Operations
@@ -148,7 +148,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
 
       if (compact) {
         // Compact mode: just method, path, and summary
-        operationList = operations.map((op) => `- **${op.method.toUpperCase()} ${op.path}** - ${op.summary || "No summary"}`).join("\n");
+        operationList = operations.map((op) => `- **${op.method} ${op.path}** - ${op.summary || "No summary"}`).join("\n");
       } else {
         // Full mode: current detailed output
         operationList = operations
@@ -265,7 +265,10 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
         const includeField = (field: string) => !fields || fields.includes(field);
 
         // Format the response
-        let details = `**Operation: ${operation.method.toUpperCase()} ${operation.path}**\n\n`;
+        let details =
+          detail_level === "full"
+            ? `**Operation Details**\n\n**${operation.method.toUpperCase()} ${operation.path}**\n\n`
+            : `**Operation: ${operation.method.toUpperCase()} ${operation.path}**\n\n`;
 
         if (includeField("operationId")) {
           details += `**Operation ID:** \`${operation.operationId || "N/A"}\`\n`;
@@ -423,7 +426,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
           };
         }
 
-        let result = `**Request Schema for ${operation.method.toUpperCase()} ${operation.path}**\n\n`;
+        let result = `**Request Body Schema for ${operation.method.toUpperCase()} ${operation.path}**\n\n`;
 
         if (content_type) {
           const content = operation.requestBody.content[content_type];
@@ -487,10 +490,10 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
           }
         }
 
-        // Apply pagination if index is provided
-        if (index !== undefined) {
+        // Apply pagination if index is provided or chunk_size is specified
+        if (index !== undefined || chunk_size !== undefined) {
           const paginated = paginateContent(result, {
-            startIndex: index,
+            startIndex: index || 0,
             chunkSize: chunk_size || 2000,
             smartBreaks: true,
           });
@@ -569,7 +572,9 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
           };
         }
 
-        let result = `**Response Schema for ${operation.method.toUpperCase()} ${operation.path}**\n\n`;
+        let result = status_code
+          ? `**Response Schema for ${status_code}**\n\n`
+          : `**Response Schemas for ${operation.method.toUpperCase()} ${operation.path}**\n\n`;
 
         if (status_code) {
           const response = operation.responses[status_code];
@@ -641,10 +646,10 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
           }
         }
 
-        // Apply pagination if index is provided
-        if (index !== undefined) {
+        // Apply pagination if index is provided or chunk_size is specified
+        if (index !== undefined || chunk_size !== undefined) {
           const paginated = paginateContent(result, {
-            startIndex: index,
+            startIndex: index || 0,
             chunkSize: chunk_size || 2000,
             smartBreaks: true,
           });
@@ -871,7 +876,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
           };
         }
 
-        result += `**Operation:** ${operation.method.toUpperCase()} ${operation.path}\n\n`;
+        result += `**Authentication for ${operation_id}**\n\n**Operation:** ${operation.method.toUpperCase()} ${operation.path}\n\n`;
 
         if (operation.security && operation.security.length > 0) {
           result += `**Security Requirements:**\n`;
@@ -910,6 +915,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
           for (const [name, scheme] of Object.entries(currentSchema.api.components.securitySchemes)) {
             const schemeObj = scheme as any;
             result += `- **${name}** (${schemeObj.type})\n`;
+            result += `  - Type: ${schemeObj.type}\n`;
 
             if (schemeObj.description) {
               result += `  - Description: ${schemeObj.description}\n`;
@@ -917,10 +923,12 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
 
             // Add practical implementation details based on scheme type
             if (schemeObj.type === "http") {
+              result += `  - Scheme: ${schemeObj.scheme}\n`;
               if (schemeObj.scheme === "bearer") {
                 result += `  - Implementation: \`Authorization: Bearer <token>\`\n`;
                 if (schemeObj.bearerFormat) {
                   result += `  - Token Format: ${schemeObj.bearerFormat}\n`;
+                  result += `  - bearerFormat: ${schemeObj.bearerFormat}\n`;
                 }
               } else if (schemeObj.scheme === "basic") {
                 result += `  - Implementation: \`Authorization: Basic <base64(username:password)>\`\n`;
@@ -1009,7 +1017,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
       if (metadata?.description) {
         info += `**Description:** ${metadata.description}\n`;
       }
-      info += `**Loaded:** ${metadata?.loadedAt.toISOString()}\n`;
+      info += `**Loaded:** ${metadata?.loadedAt ? new Date(metadata.loadedAt).toISOString() : "Unknown"}\n`;
       info += `**Path:** ${metadata?.path}\n\n`;
 
       // Server information
@@ -1087,7 +1095,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
           });
         } else {
           // Count untagged operations
-          tagCounts.set("Untagged", (tagCounts.get("Untagged") || 0) + 1);
+          tagCounts.set("untagged", (tagCounts.get("untagged") || 0) + 1);
         }
       });
 
@@ -1174,7 +1182,11 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
           };
         }
 
-        let summary = `**${operation.method.toUpperCase()} ${operation.path}**\n\n`;
+        let summary = `**Operation Summary**\n\n**${operation.method.toUpperCase()} ${operation.path}**\n`;
+
+        if (operation.operationId) {
+          summary += `**Operation ID:** ${operation.operationId}\n`;
+        }
 
         if (operation.summary) {
           summary += `**Summary:** ${operation.summary}\n`;
@@ -1245,7 +1257,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
 
       if (hasSchema && metadata) {
         helpText += `**Currently Loaded:** ${metadata.title} v${metadata.version}\n`;
-        helpText += `**Operations Available:** ${schemaStore.getOperations().length}\n`;
+        helpText += `**${schemaStore.getOperations().length} operations** available\n`;
         helpText += `**Loaded At:** ${metadata.loadedAt}\n\n`;
       } else {
         helpText += "**⚠️ No OpenAPI Spec Currently Loaded**\n\n";
@@ -1289,7 +1301,7 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
       helpText += "- `raw=true` - Get complete unfiltered schemas when absolutely necessary\n\n";
 
       if (!hasSchema) {
-        helpText += "## 🔧 Setup Instructions (No Spec Loaded)\n\n";
+        helpText += "## Setup Instructions (No Spec Loaded)\n\n";
         helpText += "To load an OpenAPI specification, you need to mount your spec file to the container:\n\n";
         helpText += "**MCP Client Configuration:**\n";
         helpText += "```json\n";

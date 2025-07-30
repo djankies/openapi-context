@@ -56,6 +56,9 @@ npx vitest tests/integration/mcp-server.test.ts --run
 ## Development Workflow
 
 ### Testing Strategy
+
+**IMPORTANT**: Always call the testing-coordinator agent to handle your testing needs.
+
 - **Unit tests**: Focus on individual components (parser, tools, schema store)
 - **Integration tests**: Test full MCP server functionality with real specs
 - **Test data**: Uses `tests/data/simple-api.yaml` and `complex-api.yaml` for consistent testing

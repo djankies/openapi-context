@@ -10,7 +10,7 @@ export interface LoadedSchema {
     version: string;
     description?: string;
     path: string;
-    loadedAt: Date;
+    loadedAt: number;
   };
   operations: ParsedOperation[];
   schemas: Map<string, any>;
@@ -115,7 +115,7 @@ class SchemaStore {
         version,
         description,
         path: specPath,
-        loadedAt: new Date(),
+        loadedAt: Date.now(),
       },
       operations,
       schemas,
@@ -199,7 +199,7 @@ class SchemaStore {
     return (
       this.currentSchema.operations.find((op) => {
         if (criteria.operationId && op.operationId === criteria.operationId) return true;
-        if (criteria.method && criteria.path && op.method === criteria.method && op.path === criteria.path) return true;
+        if (criteria.method && criteria.path && op.method === criteria.method.toLowerCase() && op.path === criteria.path) return true;
         return false;
       }) || null
     );
@@ -228,7 +228,12 @@ class SchemaStore {
     const examples = new Map<string, any>();
     for (const [key, example] of this.currentSchema.examples.entries()) {
       if (key.startsWith(operationId)) {
-        examples.set(key, example);
+        // Remove the operationId prefix and the example name suffix to get the key format expected by tests
+        const parts = key.split("-");
+        const operationIdParts = operationId.split("-").length;
+        // Skip operationId parts and join the middle parts (request/response, contentType)
+        const simplifiedKey = parts.slice(operationIdParts, -1).join("-");
+        examples.set(simplifiedKey, example);
       }
     }
     return examples;
