@@ -43,6 +43,7 @@ describe("Register Tools", () => {
         "list_tags",
         "get_operation_summary",
         "help",
+        "get_headers",
       ];
 
       // Act
@@ -106,6 +107,7 @@ describe("Register Tools", () => {
         "list_tags",
         "get_operation_summary",
         "help",
+        "get_headers",
       ];
 
       // Act
@@ -387,7 +389,7 @@ describe("Register Tools", () => {
       // Arrange
       const server = createTestMcpServer();
       const config = createTestConfig();
-      const expectedToolCount = 12; // 11 OpenAPI tools + 1 ping tool
+      const expectedToolCount = 13; // 12 OpenAPI tools + 1 ping tool
 
       // Act
       registerAllTools(server, config);
@@ -816,7 +818,7 @@ describe("Register Tools", () => {
       registerAllTools(server, emptyConfig);
 
       // Assert - Tools should still work with empty config
-      expect(getMcpToolNames(server).length).toBe(12);
+      expect(getMcpToolNames(server).length).toBe(13);
 
       // Ping should show config with defaults or undefined values
       const pingResult = await callMcpTool(server, "ping", {});
@@ -978,7 +980,7 @@ describe("Register Tools", () => {
 
       // Tool count should remain constant for each server
       servers.forEach((server) => {
-        expect(getMcpToolNames(server).length).toBe(12);
+        expect(getMcpToolNames(server).length).toBe(13);
       });
     });
 
@@ -998,7 +1000,7 @@ describe("Register Tools", () => {
 
         // Assert
         expect(registrationTime).toBeLessThan(maxRegistrationTime);
-        expect(getMcpToolNames(server).length).toBe(12);
+        expect(getMcpToolNames(server).length).toBe(13);
       },
       TIMEOUTS.UNIT,
     );
@@ -1025,11 +1027,11 @@ describe("Register Tools", () => {
       // Assert - Each server should have correct number of tools
       servers.forEach((server) => {
         const registeredTools = getMcpToolNames(server);
-        expect(registeredTools.length).toBe(12);
+        expect(registeredTools.length).toBe(13);
 
         // Verify no duplicate tools on each server
         const uniqueTools = new Set(registeredTools);
-        expect(uniqueTools.size).toBe(12);
+        expect(uniqueTools.size).toBe(13);
       });
 
       // Tools should still function correctly on one of the servers

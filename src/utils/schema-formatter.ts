@@ -7,7 +7,14 @@
 // Note: OpenAPI schemas are inherently dynamic and require any types for proper handling
 // Non-null assertions are safe in regex matching contexts
 
-import type { OpenAPISchema, OpenAPIParameter, OpenAPIRequestBody, OpenAPIResponse, OpenAPISecurityRequirement } from "../types.js";
+import type {
+  OpenAPISchema,
+  OpenAPIParameter,
+  OpenAPIRequestBody,
+  OpenAPIResponse,
+  OpenAPISecurityRequirement,
+  OpenAPIHeader,
+} from "../types.js";
 
 export interface SimplifyOptions {
   includePatterns?: boolean;
@@ -432,4 +439,65 @@ export function paginateContent(content: string, options: PaginationOptions = {}
     prevIndex: hasPrevious ? Math.max(0, startIndex - chunkSize) : undefined,
     navigationFooter,
   };
+}
+
+/**
+ * Format a header schema into a compact readable string
+ * @param header - The header object containing schema information
+ * @returns A formatted string describing the header type
+ */
+export function formatHeaderSchema(header: OpenAPIHeader): string {
+  if (!header || !header.schema) {
+    return "unknown";
+  }
+
+  const schema = header.schema;
+  let result = schema.type || "unknown";
+
+  // Add format information if available
+  if (schema.format) {
+    result += `, ${schema.format}`;
+  }
+
+  // Handle array types
+  if (schema.type === "array" && schema.items) {
+    const itemType = schema.items.type || "unknown";
+    result = `array[${itemType}]`;
+  }
+
+  // Handle enums
+  if (schema.enum && Array.isArray(schema.enum)) {
+    if (schema.enum.length <= 5) {
+      result += ` (${schema.enum.join(" | ")})`;
+    } else {
+      result += ` (enum[${schema.enum.length}])`;
+    }
+  }
+
+  // Add pattern indicator
+  if (schema.pattern) {
+    result += ", pattern";
+  }
+
+  // Add min/max for numbers
+  if (schema.type === "integer" || schema.type === "number") {
+    const constraints = [];
+    if (schema.minimum !== undefined) constraints.push(`min: ${schema.minimum}`);
+    if (schema.maximum !== undefined) constraints.push(`max: ${schema.maximum}`);
+    if (constraints.length > 0) {
+      result += ` (${constraints.join(", ")})`;
+    }
+  }
+
+  // Add length constraints for strings
+  if (schema.type === "string") {
+    const constraints = [];
+    if (schema.minLength !== undefined) constraints.push(`minLength: ${schema.minLength}`);
+    if (schema.maxLength !== undefined) constraints.push(`maxLength: ${schema.maxLength}`);
+    if (constraints.length > 0) {
+      result += ` (${constraints.join(", ")})`;
+    }
+  }
+
+  return result;
 }

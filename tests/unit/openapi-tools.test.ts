@@ -503,4 +503,92 @@ describe("OpenAPI Tools", () => {
       TIMEOUTS.UNIT,
     );
   });
+
+  describe("get_headers tool", () => {
+    let testConfig: any;
+
+    beforeEach(async () => {
+      // Clear any previous schema
+      schemaStore.clearSchema();
+      // Create test config
+      testConfig = createTestConfig();
+      // Load a test spec into schema store
+      const specPath = resolve(__dirname, "../data/complex-api.yaml");
+      await schemaStore.loadSchema(specPath);
+    });
+
+    it(
+      "should return headers for operation by operationId",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+        expect(isMcpToolRegistered(server, "get_headers")).toBe(true);
+
+        const result = await callMcpTool(server, "get_headers", {
+          operation_id: "listUsers",
+        });
+
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("Response Headers for GET /users");
+        expect(result.content[0].text).toContain("X-Rate-Limit");
+        expect(result.content[0].text).toContain("X-Request-ID");
+        expect(result.content[0].text).toContain("X-Total-Count");
+        expect(result.content[0].text).toContain("API rate limit remaining");
+      },
+      TIMEOUTS.UNIT,
+    );
+
+    it(
+      "should return headers in compact format",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+        expect(isMcpToolRegistered(server, "get_headers")).toBe(true);
+
+        const result = await callMcpTool(server, "get_headers", {
+          operation_id: "listUsers",
+          compact: true,
+        });
+
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("**X-Rate-Limit** (integer): API rate limit remaining");
+        expect(result.content[0].text).toContain("**X-Request-ID** (string, uuid): Unique request identifier");
+      },
+      TIMEOUTS.UNIT,
+    );
+
+    it(
+      "should handle operation not found",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+        expect(isMcpToolRegistered(server, "get_headers")).toBe(true);
+
+        const result = await callMcpTool(server, "get_headers", {
+          operation_id: "nonExistentOperation",
+        });
+
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("Operation Not Found");
+      },
+      TIMEOUTS.UNIT,
+    );
+
+    it(
+      "should handle no headers scenario",
+      async () => {
+        const server = createTestMcpServer();
+        registerOpenAPITools(server, testConfig);
+        expect(isMcpToolRegistered(server, "get_headers")).toBe(true);
+
+        const result = await callMcpTool(server, "get_headers", {
+          operation_id: "getUser",
+        });
+
+        expect(result.content[0].type).toBe("text");
+        expect(result.content[0].text).toContain("No headers defined");
+      },
+      TIMEOUTS.UNIT,
+    );
+  });
 });

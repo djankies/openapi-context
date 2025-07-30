@@ -2,7 +2,7 @@
 // Note: OpenAPI schemas are inherently dynamic and require any types for proper handling
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { Config } from "../types.js";
+import { Config, OpenAPIResponse, OpenAPIHeader } from "../types.js";
 import { z } from "zod";
 import { schemaStore } from "../schema-store.js";
 import {
@@ -13,6 +13,7 @@ import {
   summarizeResponses,
   summarizeAuth,
   paginateContent,
+  formatHeaderSchema,
 } from "../utils/schema-formatter.js";
 
 // Tool schemas for input validation
@@ -86,6 +87,14 @@ const GetOperationSummarySchema = {
   operation_id: z.string().optional().describe("Unique operation identifier"),
   method: z.string().optional().describe("HTTP method"),
   path: z.string().optional().describe("API path"),
+};
+
+const GetHeadersSchema = {
+  operation_id: z.string().optional().describe("Unique operation identifier"),
+  method: z.string().optional().describe("HTTP method"),
+  path: z.string().optional().describe("API path"),
+  status_code: z.string().optional().describe("Specific status code to return headers for"),
+  compact: z.boolean().optional().describe("Return simplified header format"),
 };
 
 const HelpSchema = {};
@@ -1370,5 +1379,145 @@ export function registerOpenAPITools(server: McpServer, _config: Config) {
     }
   });
 
+  // Tool 13: Get Headers
+  const getHeadersDescription = specInfo
+    ? `Get response headers from ${specInfo}. Shows HTTP headers defined for each status code with their types and descriptions.`
+    : "Get response headers (no spec loaded). Shows HTTP headers defined for each status code with their types and descriptions.";
+
+  server.tool("get_headers", getHeadersDescription, GetHeadersSchema, async ({ operation_id, method, path, status_code, compact }) => {
+    try {
+      if (!schemaStore.hasSchema()) {
+        return createNoSpecError();
+      }
+
+      let operation;
+      if (operation_id) {
+        operation = schemaStore.findOperation({ operationId: operation_id });
+      } else if (method && path) {
+        operation = schemaStore.findOperation({ method: method.toUpperCase(), path });
+      } else {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "**Missing Parameters**\n\nPlease provide either `operation_id` or both `method` and `path`.\n\n💡 Need help with tool usage? Call `help()` for detailed parameter guidance.",
+            },
+          ],
+        };
+      }
+
+      if (!operation) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `**Operation Not Found**\n\nOperation not found: ${operation_id || `${method} ${path}`}\n\n💡 Use \`list_operations()\` to see available operations or call \`help()\` for usage guidance.`,
+            },
+          ],
+        };
+      }
+
+      let result = status_code
+        ? `**Response Headers for ${status_code}**\n\n`
+        : `**Response Headers for ${operation.method.toUpperCase()} ${operation.path}**\n\n`;
+
+      let hasHeaders = false;
+
+      if (status_code) {
+        const response = operation.responses[status_code] as OpenAPIResponse;
+        if (!response) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `**Status Code Not Found**\n\nStatus code "${status_code}" not found for this operation.`,
+              },
+            ],
+          };
+        }
+
+        result += `Status Code: \`${status_code}\`\n`;
+        result += `Description: ${response.description || "No description"}\n\n`;
+
+        if (response.headers) {
+          hasHeaders = true;
+          result += formatResponseHeaders(response.headers, compact);
+        } else {
+          result += "No headers defined\n";
+        }
+      } else {
+        for (const [statusCode, response] of Object.entries(operation.responses)) {
+          const resp = response as OpenAPIResponse;
+          result += `Status Code: \`${statusCode}\`\n`;
+          result += `Description: ${resp.description || "No description"}\n`;
+
+          if (resp.headers) {
+            hasHeaders = true;
+            result += formatResponseHeaders(resp.headers, compact);
+          } else {
+            result += "No headers defined\n";
+          }
+          result += "\n";
+        }
+      }
+
+      if (!hasHeaders && !status_code) {
+        result += "No headers defined for any response in this operation.\n";
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result,
+          },
+        ],
+      };
+    } catch (error) {
+      console.error("Get headers tool error:", error);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `**Error Getting Headers**\n\n${error instanceof Error ? error.message : String(error)}\n\n💡 Call \`help()\` for troubleshooting guidance.`,
+          },
+        ],
+      };
+    }
+  });
+
   console.log("OpenAPI tools registered successfully");
+}
+
+/**
+ * Format headers for a response into a readable string
+ * @param headers - The headers object from an OpenAPI response
+ * @param compact - Whether to use compact formatting
+ * @returns Formatted string representation of the headers
+ */
+function formatResponseHeaders(headers: Record<string, OpenAPIHeader>, compact: boolean = false): string {
+  let result = "";
+
+  for (const [headerName, header] of Object.entries(headers)) {
+    if (compact) {
+      const headerType = formatHeaderSchema(header);
+      result += `- **${headerName}** (${headerType})`;
+      if (header.description) {
+        result += `: ${header.description}`;
+      }
+      result += "\n";
+    } else {
+      result += `- **${headerName}**\n`;
+      result += `  - Type: ${formatHeaderSchema(header)}\n`;
+      if (header.description) {
+        result += `  - Description: ${header.description}\n`;
+      }
+      if (header.required) {
+        result += `  - Required: ${header.required ? "Yes" : "No"}\n`;
+      }
+      result += "\n";
+    }
+  }
+
+  return result;
 }
